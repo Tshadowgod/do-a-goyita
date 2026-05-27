@@ -79,7 +79,11 @@ export function ProductModal({ open, onClose, product, onSaved }: Props) {
     });
 
     if (!res.ok) {
-      toast.error("Error al guardar producto");
+      const body = await res.json().catch(() => ({}));
+      const msg = Array.isArray(body.error)
+        ? body.error.map((e: { message: string }) => e.message).join(", ")
+        : body.error ?? "Error desconocido";
+      toast.error(`Error: ${msg}`);
       return;
     }
     toast.success(product ? "Producto actualizado" : "Producto creado");
