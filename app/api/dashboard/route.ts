@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
 import { db } from "@/lib/db";
 import { sales, saleItems, expenses, products } from "@/lib/db/schema";
 import { gte, lte, and, eq, lt, count } from "drizzle-orm";
