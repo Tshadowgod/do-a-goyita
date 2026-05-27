@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { X, ZapOff, ScanLine } from "lucide-react";
+import { X, ZapOff } from "lucide-react";
 
 interface Props {
   onDetected: (barcode: string) => void;
@@ -8,9 +8,12 @@ interface Props {
 }
 
 export function BarcodeScanner({ onDetected, onClose }: Props) {
-  const videoRef    = useRef<HTMLVideoElement>(null);
-  const controlsRef = useRef<{ stop: () => void } | null>(null);
-  const detectedRef = useRef(false);
+  const videoRef      = useRef<HTMLVideoElement>(null);
+  const controlsRef   = useRef<{ stop: () => void } | null>(null);
+  const detectedRef   = useRef(false);
+  const onDetectedRef = useRef(onDetected);
+  onDetectedRef.current = onDetected;
+
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -19,7 +22,7 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
 
     async function start() {
       try {
-        const { BrowserMultiFormatReader, BrowserCodeReader } = await import("@zxing/browser");
+        const { BrowserMultiFormatReader } = await import("@zxing/browser");
         const reader = new BrowserMultiFormatReader();
 
         if (!videoRef.current) return;
@@ -33,11 +36,11 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
             },
           },
           videoRef.current,
-          (result, err, ctrl) => {
+          (result, _err) => {
             if (result && !detectedRef.current) {
               detectedRef.current = true;
-              ctrl.stop();
-              onDetected(result.getText());
+              controlsRef.current?.stop();
+              onDetectedRef.current(result.getText());
             }
           }
         );
@@ -62,7 +65,7 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
     return () => {
       controlsRef.current?.stop();
     };
-  }, [onDetected]);
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center">
@@ -101,19 +104,16 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
               {/* Scanning overlay */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="relative w-60 h-44">
-                  {/* Corner brackets */}
                   <span className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-brand-400 rounded-tl-lg" />
                   <span className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-brand-400 rounded-tr-lg" />
                   <span className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-brand-400 rounded-bl-lg" />
                   <span className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-brand-400 rounded-br-lg" />
-                  {/* Scan line */}
                   {ready && (
                     <span className="absolute left-2 right-2 top-1/2 h-0.5 bg-brand-400 opacity-80 animate-pulse" />
                   )}
                 </div>
               </div>
 
-              {/* Dim outside scan area */}
               <div className="absolute inset-0 pointer-events-none"
                 style={{
                   background: "radial-gradient(ellipse 15rem 11rem at 50% 50%, transparent 0%, rgba(0,0,0,0.55) 100%)"
