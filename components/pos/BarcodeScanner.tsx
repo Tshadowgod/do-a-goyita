@@ -9,7 +9,7 @@ interface Props {
 
 export function BarcodeScanner({ onDetected, onClose }: Props) {
   const videoRef      = useRef<HTMLVideoElement>(null);
-  const controlsRef   = useRef<{ stop: () => void } | null>(null);
+  const streamRef     = useRef<MediaStream | null>(null);
   const detectedRef   = useRef(false);
   const onDetectedRef = useRef(onDetected);
   onDetectedRef.current = onDetected;
@@ -22,31 +22,67 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
 
     async function start() {
       try {
-        const { BrowserMultiFormatReader } = await import("@zxing/browser");
-        const reader = new BrowserMultiFormatReader();
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width:  { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+        });
+
+        streamRef.current = stream;
 
         if (!videoRef.current) return;
-
-        const controls = await reader.decodeFromConstraints(
-          {
-            video: {
-              facingMode: { ideal: "environment" },
-              width:  { ideal: 1280 },
-              height: { ideal: 720 },
-            },
-          },
-          videoRef.current,
-          (result, _err) => {
-            if (result && !detectedRef.current) {
-              detectedRef.current = true;
-              controlsRef.current?.stop();
-              onDetectedRef.current(result.getText());
-            }
-          }
-        );
-
-        controlsRef.current = controls;
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
         setReady(true);
+
+        // Use native BarcodeDetector (Chrome Android) when available
+        if ("BarcodeDetector" in window) {
+          const detector = new (window as any).BarcodeDetector({
+            formats: [
+              "ean_13", "ean_8", "upc_a", "upc_e",
+              "code_128", "code_39", "code_93",
+              "qr_code", "itf", "codabar",
+            ],
+          });
+
+          const scan = async () => {
+            if (detectedRef.current) return;
+            try {
+              if (videoRef.current && videoRef.current.readyState >= 2) {
+                const barcodes = await detector.detect(videoRef.current);
+                if (barcodes.length > 0 && !detectedRef.current) {
+                  detectedRef.current = true;
+                  stopStream();
+                  onDetectedRef.current(barcodes[0].rawValue);
+                  return;
+                }
+              }
+            } catch { /* frame not ready */ }
+            if (!detectedRef.current) requestAnimationFrame(scan);
+          };
+
+          requestAnimationFrame(scan);
+
+        } else {
+          // Fallback: ZXing
+          const { BrowserMultiFormatReader } = await import("@zxing/browser");
+          const reader = new BrowserMultiFormatReader();
+          const controls = await reader.decodeFromConstraints(
+            { video: { facingMode: { ideal: "environment" } } },
+            videoRef.current!,
+            (result) => {
+              if (result && !detectedRef.current) {
+                detectedRef.current = true;
+                controls?.stop();
+                stopStream();
+                onDetectedRef.current(result.getText());
+              }
+            }
+          );
+        }
+
       } catch (e: unknown) {
         const msg = (e instanceof Error ? e.message : String(e)).toLowerCase();
         if (msg.includes("permission") || msg.includes("denied") || msg.includes("notallowed")) {
@@ -60,19 +96,29 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
       }
     }
 
+    function stopStream() {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    }
+
     start();
 
     return () => {
-      controlsRef.current?.stop();
+      detectedRef.current = true; // stop scan loop
+      streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
+
+  function handleClose() {
+    detectedRef.current = true;
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    onClose();
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center">
       <div className="relative w-full max-w-sm mx-4">
-        {/* Close button */}
         <button
-          onClick={() => { controlsRef.current?.stop(); onClose(); }}
+          onClick={handleClose}
           className="absolute top-3 right-3 z-20 bg-white/20 text-white rounded-full p-2 hover:bg-white/40 transition-colors"
         >
           <X className="h-5 w-5" />
@@ -84,7 +130,7 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
             <p className="text-lg font-semibold">Error de cámara</p>
             <p className="text-sm text-white/70 leading-relaxed">{error}</p>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="mt-2 px-6 py-2 bg-white/20 text-white rounded-xl hover:bg-white/30 text-sm font-medium"
             >
               Cerrar
@@ -98,10 +144,8 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
                 className="w-full aspect-[4/3] object-cover"
                 playsInline
                 muted
-                autoPlay
               />
 
-              {/* Scanning overlay */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="relative w-60 h-44">
                   <span className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-brand-400 rounded-tl-lg" />
@@ -114,9 +158,10 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
                 </div>
               </div>
 
-              <div className="absolute inset-0 pointer-events-none"
+              <div
+                className="absolute inset-0 pointer-events-none"
                 style={{
-                  background: "radial-gradient(ellipse 15rem 11rem at 50% 50%, transparent 0%, rgba(0,0,0,0.55) 100%)"
+                  background: "radial-gradient(ellipse 15rem 11rem at 50% 50%, transparent 0%, rgba(0,0,0,0.55) 100%)",
                 }}
               />
             </div>
