@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: err.errors }, { status: 400 });
     }
     console.error(err);
-    return NextResponse.json({ error: "Error al crear producto" }, { status: 500 });
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
