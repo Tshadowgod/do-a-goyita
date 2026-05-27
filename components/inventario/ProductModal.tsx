@@ -1,10 +1,10 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import toast from "react-hot-toast";
-import { Camera, Loader2, Barcode } from "lucide-react";
+import { Loader2, Barcode } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -45,9 +45,6 @@ interface Props {
 }
 
 export function ProductModal({ open, onClose, product, onSaved }: Props) {
-  const [aiLoading, setAiLoading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-
   const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
@@ -90,55 +87,9 @@ export function ProductModal({ open, onClose, product, onSaved }: Props) {
     onClose();
   }
 
-  async function handleAiDetect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setAiLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append("image", file);
-      const res = await fetch("/api/ai-detect", { method: "POST", body: formData });
-      if (!res.ok) throw new Error();
-      const result = await res.json();
-
-      if (result.name)     setValue("name",        result.name);
-      if (result.description) setValue("description", result.description);
-      if (result.category) setValue("category",    result.category);
-      if (result.unit)     setValue("unit",         result.unit);
-      if (result.barcode)  setValue("barcode",      result.barcode);
-
-      toast.success("Producto detectado por IA");
-    } catch {
-      toast.error("No se pudo detectar el producto");
-    } finally {
-      setAiLoading(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  }
-
   return (
     <Modal open={open} onClose={onClose} title={product ? "Editar Producto" : "Nuevo Producto"} size="lg">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        {/* AI detect button */}
-        <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-          <Camera className="h-5 w-5 text-slate-400 shrink-0" />
-          <div className="flex-1">
-            <p className="text-xs font-medium text-slate-700">Detectar con IA</p>
-            <p className="text-xs text-slate-500">Saca una foto y Claude detecta el producto automáticamente</p>
-          </div>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAiDetect} />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            loading={aiLoading}
-            onClick={() => fileRef.current?.click()}
-          >
-            {aiLoading ? "Analizando..." : "Fotografiar"}
-          </Button>
-        </div>
-
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
             <Input label="Nombre del producto *" {...register("name")} error={errors.name?.message} />
