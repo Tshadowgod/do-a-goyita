@@ -52,9 +52,11 @@ export async function POST(req: NextRequest) {
 
     const [product] = await db.insert(products).values({
       ...data,
-      price: String(data.price),
-      cost:  data.cost != null ? String(data.cost) : null,
-      imageUrl: data.imageUrl || null,
+      price:    String(data.price),
+      cost:     data.cost != null && data.cost !== 0 ? String(data.cost) : null,
+      imageUrl: data.imageUrl  || null,
+      barcode:  data.barcode   || null,
+      category: data.category  || null,
     }).returning();
 
     return NextResponse.json(product, { status: 201 });

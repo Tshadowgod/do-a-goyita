@@ -37,8 +37,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const data = updateSchema.parse(body);
 
     const updateData: Record<string, unknown> = { ...data, updatedAt: new Date() };
-    if (data.price != null) updateData.price = String(data.price);
-    if (data.cost  != null) updateData.cost  = String(data.cost);
+    if (data.price != null) updateData.price    = String(data.price);
+    if (data.cost  != null) updateData.cost     = data.cost !== 0 ? String(data.cost) : null;
+    if (data.barcode  !== undefined) updateData.barcode  = data.barcode  || null;
+    if (data.imageUrl !== undefined) updateData.imageUrl = data.imageUrl || null;
+    if (data.category !== undefined) updateData.category = data.category || null;
 
     const [updated] = await db.update(products)
       .set(updateData)
