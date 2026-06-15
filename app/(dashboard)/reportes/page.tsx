@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { formatCurrency, EXPENSE_CATEGORIES } from "@/lib/utils";
 import { Target, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 
-const COLORS = ["#16a34a", "#2563eb", "#d97706", "#dc2626", "#7c3aed", "#0891b2", "#475569"];
+const COLORS = ["#f08a1e", "#2563eb", "#d97706", "#dc2626", "#7c3aed", "#0891b2", "#475569"];
 
 const categoryLabel = (v: string) => EXPENSE_CATEGORIES.find((c) => c.value === v)?.label ?? v;
 
@@ -111,10 +111,10 @@ export default function ReportesPage() {
                     <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `Bs ${v}`} />
                     <Tooltip formatter={(v: number) => formatCurrency(v)} />
                     <Legend />
-                    <Bar dataKey="Ingresos"     fill="#16a34a" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="Costo prod."  fill="#d97706" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="Ingresos"     fill="#f08a1e" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="Costo prod."  fill="#2563eb" radius={[6, 6, 0, 0]} />
                     <Bar dataKey="Egresos"      fill="#ef4444" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="Ganancia"     fill="#2563eb" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="Ganancia"     fill="#7c3aed" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>

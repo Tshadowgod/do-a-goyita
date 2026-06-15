@@ -108,8 +108,8 @@ export default function DashboardPage() {
               <AreaChart data={chart} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="gIngresos" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#16a34a" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#16a34a" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#f08a1e" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#f08a1e" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="gEgresos" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
@@ -121,7 +121,7 @@ export default function DashboardPage() {
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `Bs ${v}`} />
                 <Tooltip formatter={(v: number) => formatCurrency(v)} labelFormatter={(l) => formatDate(l)} />
                 <Legend />
-                <Area type="monotone" dataKey="ingresos" name="Ingresos" stroke="#16a34a" fill="url(#gIngresos)" strokeWidth={2} />
+                <Area type="monotone" dataKey="ingresos" name="Ingresos" stroke="#f08a1e" fill="url(#gIngresos)" strokeWidth={2} />
                 <Area type="monotone" dataKey="egresos"  name="Egresos"  stroke="#ef4444" fill="url(#gEgresos)"  strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
