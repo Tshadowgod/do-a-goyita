@@ -63,6 +63,18 @@ export function Sidebar() {
   );
 }
 
+export function MobileTopBar() {
+  return (
+    <div className="md:hidden sticky top-0 z-30 flex items-center gap-2 bg-white border-b border-slate-200 px-4 py-2.5">
+      <img src="/logo.png" alt="Doña Goyita" className="h-9 w-9 rounded-lg object-cover bg-white" />
+      <div className="leading-tight">
+        <p className="font-bold text-slate-900 text-sm">Doña Goyita</p>
+        <p className="text-[11px] text-slate-400">Sistema de Ventas</p>
+      </div>
+    </div>
+  );
+}
+
 export function BottomNav() {
   const pathname = usePathname();
 
