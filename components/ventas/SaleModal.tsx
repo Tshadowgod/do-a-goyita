@@ -90,12 +90,15 @@ export function SaleModal({ open, onClose, sale, onSaved }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ paymentMethod, notes, items }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? "Error al actualizar la venta");
+      }
       toast.success("Venta actualizada y stock ajustado");
       onSaved();
       onClose();
-    } catch {
-      toast.error("Error al actualizar la venta");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al actualizar la venta");
     } finally {
       setSaving(false);
     }

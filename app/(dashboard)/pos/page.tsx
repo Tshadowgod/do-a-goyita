@@ -46,7 +46,12 @@ export default function POSPage() {
       return;
     }
 
-    addItem({ productId: product.id, name: product.name, price: parseFloat(product.price), quantity: 1, imageUrl: product.imageUrl });
+    const inCart = items.find((i) => i.productId === product.id)?.quantity ?? 0;
+    if (inCart >= (product.quantity ?? 0)) {
+      toast.error(`Solo hay ${product.quantity} en stock de ${product.name}`);
+      return;
+    }
+    addItem({ productId: product.id, name: product.name, price: parseFloat(product.price), quantity: 1, stock: product.quantity ?? 0, imageUrl: product.imageUrl });
     toast.success(`Agregado: ${product.name}`);
     setCartOpen(true);
   }
@@ -56,7 +61,12 @@ export default function POSPage() {
       toast.error("Sin stock disponible");
       return;
     }
-    addItem({ productId: p.id, name: p.name, price: parseFloat(p.price), quantity: 1, imageUrl: p.imageUrl });
+    const inCart = items.find((i) => i.productId === p.id)?.quantity ?? 0;
+    if (inCart >= (p.quantity ?? 0)) {
+      toast.error(`Solo hay ${p.quantity} en stock`);
+      return;
+    }
+    addItem({ productId: p.id, name: p.name, price: parseFloat(p.price), quantity: 1, stock: p.quantity ?? 0, imageUrl: p.imageUrl });
     toast.success(`Agregado: ${p.name}`);
   }
 

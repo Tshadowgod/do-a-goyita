@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { db } from "@/lib/db";
-import { sales, saleItems } from "@/lib/db/schema";
+import { sales, saleItems, products, lotConsumptions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { consumeFifo, restoreSaleConsumptions } from "@/lib/inventory";
@@ -47,6 +47,29 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // If items were provided, reconcile stock (FIFO) and replace line items
     if (data.items) {
+      // Validate stock: available = current stock + what THIS sale already consumed
+      const oldCons = await db.select().from(lotConsumptions).where(eq(lotConsumptions.saleId, saleId));
+      const consumedByProduct = new Map<number, number>();
+      for (const c of oldCons) {
+        if (c.productId != null) consumedByProduct.set(c.productId, (consumedByProduct.get(c.productId) ?? 0) + c.quantity);
+      }
+      const insufficient: string[] = [];
+      for (const item of data.items) {
+        if (item.productId == null) continue;
+        const [product] = await db.select().from(products).where(eq(products.id, item.productId));
+        if (!product) { insufficient.push(`Producto #${item.productId} no existe`); continue; }
+        const available = (product.quantity ?? 0) + (consumedByProduct.get(item.productId) ?? 0);
+        if (available < item.quantity) {
+          insufficient.push(`${product.name} (disponible: ${available}, pediste: ${item.quantity})`);
+        }
+      }
+      if (insufficient.length) {
+        return NextResponse.json(
+          { error: `Stock insuficiente: ${insufficient.join("; ")}` },
+          { status: 400 },
+        );
+      }
+
       // 1. Return the lots consumed by the original sale
       await restoreSaleConsumptions(saleId);
 

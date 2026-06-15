@@ -37,7 +37,8 @@ export function Cart({ onSaleComplete }: Props) {
     setLoading(false);
 
     if (!res.ok) {
-      toast.error("Error al registrar la venta");
+      const body = await res.json().catch(() => ({}));
+      toast.error(body.error ?? "Error al registrar la venta");
       return;
     }
 
@@ -75,8 +76,15 @@ export function Cart({ onSaleComplete }: Props) {
               </button>
               <span className="w-8 text-center text-sm font-semibold">{item.quantity}</span>
               <button
-                onClick={() => updateQty(item.productId, item.quantity + 1)}
-                className="h-7 w-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100"
+                onClick={() => {
+                  if (item.stock != null && item.quantity >= item.stock) {
+                    toast.error(`Solo hay ${item.stock} en stock`);
+                    return;
+                  }
+                  updateQty(item.productId, item.quantity + 1);
+                }}
+                disabled={item.stock != null && item.quantity >= item.stock}
+                className="h-7 w-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Plus className="h-3 w-3" />
               </button>

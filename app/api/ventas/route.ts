@@ -37,6 +37,22 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const data = saleSchema.parse(body);
 
+    // Validate stock — never sell more than the available inventory
+    const insufficient: string[] = [];
+    for (const item of data.items) {
+      const [product] = await db.select().from(products).where(eq(products.id, item.productId));
+      if (!product) { insufficient.push(`Producto #${item.productId} no existe`); continue; }
+      if ((product.quantity ?? 0) < item.quantity) {
+        insufficient.push(`${product.name} (disponible: ${product.quantity ?? 0}, pediste: ${item.quantity})`);
+      }
+    }
+    if (insufficient.length) {
+      return NextResponse.json(
+        { error: `Stock insuficiente: ${insufficient.join("; ")}` },
+        { status: 400 },
+      );
+    }
+
     const total = data.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
 
     const [sale] = await db.insert(sales).values({
