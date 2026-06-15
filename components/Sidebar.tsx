@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -9,8 +9,18 @@ import {
   Package,
   TrendingDown,
   BarChart2,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+function useLogout() {
+  const router = useRouter();
+  return async () => {
+    await fetch("/api/logout", { method: "POST" });
+    router.replace("/login");
+    router.refresh();
+  };
+}
 
 const NAV = [
   { href: "/dashboard",  label: "Dashboard",        icon: LayoutDashboard },
@@ -58,21 +68,39 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="px-6 py-4 border-t border-slate-800">
+      <div className="px-3 py-4 border-t border-slate-800 space-y-2">
+        <LogoutButton />
         <p className="text-xs text-slate-500 text-center">v1.0 · Doña Goyita</p>
       </div>
     </aside>
   );
 }
 
+function LogoutButton() {
+  const logout = useLogout();
+  return (
+    <button
+      onClick={logout}
+      className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-all"
+    >
+      <LogOut className="h-5 w-5 shrink-0" />
+      Cerrar sesión
+    </button>
+  );
+}
+
 export function MobileTopBar() {
+  const logout = useLogout();
   return (
     <div className="md:hidden sticky top-0 z-30 flex items-center gap-2 bg-white border-b border-slate-200 px-4 py-2.5">
       <img src="/logo.png" alt="Doña Goyita" className="h-9 w-9 rounded-lg object-cover bg-white" />
-      <div className="leading-tight">
+      <div className="leading-tight flex-1">
         <p className="font-bold text-slate-900 text-sm">Doña Goyita</p>
         <p className="text-[11px] text-slate-400">Sistema de Ventas</p>
       </div>
+      <button onClick={logout} className="text-slate-400 hover:text-red-600 p-1.5" title="Cerrar sesión">
+        <LogOut className="h-5 w-5" />
+      </button>
     </div>
   );
 }
