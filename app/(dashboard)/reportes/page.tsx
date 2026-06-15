@@ -19,7 +19,10 @@ const categoryLabel = (v: string) => EXPENSE_CATEGORIES.find((c) => c.value === 
 interface ReportData {
   salesTotal:          number;
   salesCount:          number;
+  cogsTotal:           number;
+  grossProfit:         number;
   expensesTotal:       number;
+  netProfit:           number;
   expensesByCategory:  { category: string; total: string }[];
 }
 
@@ -42,7 +45,7 @@ export default function ReportesPage() {
 
   useEffect(() => { load(); }, []);
 
-  const net = data ? data.salesTotal - data.expensesTotal : 0;
+  const net = data ? data.netProfit : 0;
 
   const pieData = data?.expensesByCategory.map((e) => ({
     name:  categoryLabel(e.category),
@@ -50,10 +53,10 @@ export default function ReportesPage() {
   })) ?? [];
 
   const summaryCards = data ? [
-    { label: "Ingresos",     value: formatCurrency(data.salesTotal),    icon: TrendingUp,   color: "text-green-600",  bg: "bg-green-50" },
-    { label: "Ventas (#)",   value: String(data.salesCount),            icon: DollarSign,   color: "text-blue-600",   bg: "bg-blue-50" },
-    { label: "Egresos",      value: formatCurrency(data.expensesTotal), icon: TrendingDown, color: "text-red-600",    bg: "bg-red-50" },
-    { label: "Ganancia",     value: formatCurrency(net),                icon: Target,       color: net >= 0 ? "text-green-600" : "text-red-600", bg: net >= 0 ? "bg-green-50" : "bg-red-50" },
+    { label: "Ingresos",          value: formatCurrency(data.salesTotal),    icon: TrendingUp,   color: "text-green-600",  bg: "bg-green-50" },
+    { label: "Costo Productos",   value: formatCurrency(data.cogsTotal),     icon: DollarSign,   color: "text-amber-600",  bg: "bg-amber-50" },
+    { label: "Egresos",           value: formatCurrency(data.expensesTotal), icon: TrendingDown, color: "text-red-600",    bg: "bg-red-50" },
+    { label: "Ganancia Neta",     value: formatCurrency(net),                icon: Target,       color: net >= 0 ? "text-green-600" : "text-red-600", bg: net >= 0 ? "bg-green-50" : "bg-red-50" },
   ] : [];
 
   return (
@@ -98,19 +101,20 @@ export default function ReportesPage() {
             {/* Comparison bar chart */}
             <Card>
               <CardHeader>
-                <h3 className="font-semibold text-slate-800">Ingresos vs Egresos</h3>
+                <h3 className="font-semibold text-slate-800">Ingresos · Costos · Ganancia</h3>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={[{ name: "Período", Ingresos: data.salesTotal, Egresos: data.expensesTotal, Ganancia: Math.max(0, net) }]}>
+                  <BarChart data={[{ name: "Período", Ingresos: data.salesTotal, "Costo prod.": data.cogsTotal, Egresos: data.expensesTotal, Ganancia: net }]}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                     <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `Bs ${v}`} />
                     <Tooltip formatter={(v: number) => formatCurrency(v)} />
                     <Legend />
-                    <Bar dataKey="Ingresos"  fill="#16a34a" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="Egresos"   fill="#ef4444" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="Ganancia"  fill="#2563eb" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="Ingresos"     fill="#16a34a" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="Costo prod."  fill="#d97706" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="Egresos"      fill="#ef4444" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="Ganancia"     fill="#2563eb" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -148,24 +152,31 @@ export default function ReportesPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid sm:grid-cols-3 gap-4 text-sm">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                   <div className="p-4 bg-slate-50 rounded-xl">
-                    <p className="text-slate-500 text-xs uppercase tracking-wide mb-1">Ingresos del período</p>
+                    <p className="text-slate-500 text-xs uppercase tracking-wide mb-1">Ingresos (ventas)</p>
                     <p className="text-2xl font-bold text-slate-900">{formatCurrency(data.salesTotal)}</p>
                   </div>
+                  <div className="p-4 bg-amber-50 rounded-xl">
+                    <p className="text-slate-500 text-xs uppercase tracking-wide mb-1">Costo de productos</p>
+                    <p className="text-2xl font-bold text-amber-700">− {formatCurrency(data.cogsTotal)}</p>
+                  </div>
                   <div className="p-4 bg-red-50 rounded-xl">
-                    <p className="text-slate-500 text-xs uppercase tracking-wide mb-1">Total egresos</p>
-                    <p className="text-2xl font-bold text-red-700">{formatCurrency(data.expensesTotal)}</p>
+                    <p className="text-slate-500 text-xs uppercase tracking-wide mb-1">Egresos (gastos)</p>
+                    <p className="text-2xl font-bold text-red-700">− {formatCurrency(data.expensesTotal)}</p>
                   </div>
                   <div className={`p-4 rounded-xl ${net >= 0 ? "bg-green-50" : "bg-red-50"}`}>
-                    <p className="text-slate-500 text-xs uppercase tracking-wide mb-1">Resultado neto</p>
+                    <p className="text-slate-500 text-xs uppercase tracking-wide mb-1">Ganancia neta</p>
                     <p className={`text-2xl font-bold ${net >= 0 ? "text-green-700" : "text-red-700"}`}>{formatCurrency(net)}</p>
                   </div>
                 </div>
-                <div className="mt-4">
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Badge variant="gray" className="text-sm px-4 py-2">
+                    Ganancia bruta (ventas − costo): {formatCurrency(data.grossProfit)}
+                  </Badge>
                   {net >= 0 ? (
                     <Badge variant="green" className="text-sm px-4 py-2">
-                      ✓ Negocio rentable en este período · Margen: {data.salesTotal > 0 ? ((net / data.salesTotal) * 100).toFixed(1) : 0}%
+                      ✓ Negocio rentable · Margen neto: {data.salesTotal > 0 ? ((net / data.salesTotal) * 100).toFixed(1) : 0}%
                     </Badge>
                   ) : (
                     <Badge variant="red" className="text-sm px-4 py-2">

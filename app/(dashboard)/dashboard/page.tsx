@@ -42,18 +42,18 @@ export default function DashboardPage() {
 
   const statCards = stats ? [
     {
-      label: "Ventas Hoy",
-      value: formatCurrency(stats.salesToday),
-      icon: ShoppingCart,
-      color: "text-brand-600",
-      bg: "bg-brand-50",
-    },
-    {
       label: "Ingresos del Mes",
       value: formatCurrency(stats.salesThisMonth),
       icon: TrendingUp,
       color: "text-blue-600",
       bg: "bg-blue-50",
+    },
+    {
+      label: "Costo de Productos",
+      value: formatCurrency(stats.cogsThisMonth),
+      icon: ShoppingCart,
+      color: "text-amber-600",
+      bg: "bg-amber-50",
     },
     {
       label: "Egresos del Mes",
@@ -118,7 +118,7 @@ export default function DashboardPage() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(v) => v.slice(5)} />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `L${v}`} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `Bs ${v}`} />
                 <Tooltip formatter={(v: number) => formatCurrency(v)} labelFormatter={(l) => formatDate(l)} />
                 <Legend />
                 <Area type="monotone" dataKey="ingresos" name="Ingresos" stroke="#16a34a" fill="url(#gIngresos)" strokeWidth={2} />

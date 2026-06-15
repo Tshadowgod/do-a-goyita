@@ -8,7 +8,10 @@ export interface CartItem {
 
 export interface DashboardStats {
   salesToday:        number;
+  profitToday:       number;
   salesThisMonth:    number;
+  cogsThisMonth:     number;
+  grossProfit:       number;
   expensesThisMonth: number;
   netIncome:         number;
   totalProducts:     number;

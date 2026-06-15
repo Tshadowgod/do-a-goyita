@@ -24,6 +24,21 @@ export async function GET() {
       total: sql<string>`COALESCE(SUM(${sales.total}), 0)`,
     }).from(sales).where(gte(sales.createdAt, firstOfMonth));
 
+    // Cost of goods sold (today / this month)
+    const [todayCogsRow] = await db.select({
+      total: sql<string>`COALESCE(SUM(${products.cost} * ${saleItems.quantity}), 0)`,
+    }).from(saleItems)
+      .innerJoin(sales, eq(saleItems.saleId, sales.id))
+      .innerJoin(products, eq(saleItems.productId, products.id))
+      .where(gte(sales.createdAt, today));
+
+    const [monthCogsRow] = await db.select({
+      total: sql<string>`COALESCE(SUM(${products.cost} * ${saleItems.quantity}), 0)`,
+    }).from(saleItems)
+      .innerJoin(sales, eq(saleItems.saleId, sales.id))
+      .innerJoin(products, eq(saleItems.productId, products.id))
+      .where(gte(sales.createdAt, firstOfMonth));
+
     // Expenses this month
     const monthExpensesRows = await db.select({
       total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)`,
@@ -48,9 +63,13 @@ export async function GET() {
     const salesThisMonth    = parseFloat(monthSalesRows[0]?.total ?? "0");
     const expensesThisMonth = parseFloat(monthExpensesRows[0]?.total ?? "0");
     const fixedCosts        = parseFloat(fixedExpensesRows[0]?.total ?? "0");
+    const cogsToday         = parseFloat(todayCogsRow?.total ?? "0");
+    const cogsThisMonth     = parseFloat(monthCogsRow?.total ?? "0");
+    const grossProfit       = salesThisMonth - cogsThisMonth;
 
-    // Break-even calculation
-    const variableCostRatio = salesThisMonth > 0 ? (expensesThisMonth - fixedCosts) / salesThisMonth : 0;
+    // Break-even calculation – product cost (COGS) and non-fixed expenses are variable
+    const variableCosts = cogsThisMonth + Math.max(0, expensesThisMonth - fixedCosts);
+    const variableCostRatio = salesThisMonth > 0 ? variableCosts / salesThisMonth : 0;
     const contributionMargin = 1 - variableCostRatio;
     const breakEvenRevenue = contributionMargin > 0 ? fixedCosts / contributionMargin : 0;
     const marginOfSafety = salesThisMonth > 0
@@ -82,11 +101,16 @@ export async function GET() {
       });
     }
 
+    const salesToday = parseFloat(todaySalesRows[0]?.total ?? "0");
+
     const stats: DashboardStats = {
-      salesToday:        parseFloat(todaySalesRows[0]?.total ?? "0"),
+      salesToday,
+      profitToday:       salesToday - cogsToday,
       salesThisMonth,
+      cogsThisMonth,
+      grossProfit,
       expensesThisMonth,
-      netIncome:         salesThisMonth - expensesThisMonth,
+      netIncome:         salesThisMonth - cogsThisMonth - expensesThisMonth,
       totalProducts:     totalProductsRows[0]?.count ?? 0,
       lowStockProducts:  lowStockRows[0]?.count ?? 0,
       breakEven: {

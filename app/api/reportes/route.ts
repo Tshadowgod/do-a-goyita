@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { db } from "@/lib/db";
-import { sales, expenses } from "@/lib/db/schema";
-import { gte, lte, and } from "drizzle-orm";
+import { sales, saleItems, products, expenses } from "@/lib/db/schema";
+import { gte, lte, and, eq } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { boliviaDayStart, boliviaDayEnd } from "@/lib/utils";
 
@@ -25,6 +25,14 @@ export async function GET(req: NextRequest) {
       count: sql<number>`COUNT(*)`,
     }).from(sales).where(conditions.length ? and(...conditions) : undefined);
 
+    // Cost of goods sold = sum(product cost * quantity sold) over the period
+    const [cogsRow] = await db.select({
+      total: sql<string>`COALESCE(SUM(${products.cost} * ${saleItems.quantity}), 0)`,
+    }).from(saleItems)
+      .innerJoin(sales, eq(saleItems.saleId, sales.id))
+      .innerJoin(products, eq(saleItems.productId, products.id))
+      .where(conditions.length ? and(...conditions) : undefined);
+
     const [expensesTotal] = await db.select({
       total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)`,
     }).from(expenses).where(expConditions.length ? and(...expConditions) : undefined);
@@ -36,10 +44,17 @@ export async function GET(req: NextRequest) {
       .where(expConditions.length ? and(...expConditions) : undefined)
       .groupBy(expenses.category);
 
+    const sales_ = parseFloat(salesTotal?.total ?? "0");
+    const cogs   = parseFloat(cogsRow?.total ?? "0");
+    const exp    = parseFloat(expensesTotal?.total ?? "0");
+
     return NextResponse.json({
-      salesTotal:          parseFloat(salesTotal?.total ?? "0"),
+      salesTotal:          sales_,
       salesCount:          salesTotal?.count ?? 0,
-      expensesTotal:       parseFloat(expensesTotal?.total ?? "0"),
+      cogsTotal:           cogs,
+      grossProfit:         sales_ - cogs,
+      expensesTotal:       exp,
+      netProfit:           sales_ - cogs - exp,
       expensesByCategory,
     });
   } catch (err) {
