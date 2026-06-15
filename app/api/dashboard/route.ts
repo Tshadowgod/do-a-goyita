@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { db } from "@/lib/db";
 import { sales, saleItems, expenses, products } from "@/lib/db/schema";
-import { gte, lte, and, eq, lt, count } from "drizzle-orm";
+import { gte, and, eq, lt, count, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { FIXED_EXPENSE_CATEGORIES, boliviaDayStart, boliviaToday } from "@/lib/utils";
 import type { DashboardStats, SalesChartPoint } from "@/types";
@@ -35,7 +35,7 @@ export async function GET() {
     }).from(expenses).where(
       and(
         gte(expenses.date, firstOfMonthStr),
-        sql`${expenses.category} = ANY(${JSON.stringify(FIXED_EXPENSE_CATEGORIES)}::text[])`,
+        inArray(expenses.category, FIXED_EXPENSE_CATEGORIES),
       )
     );
 
