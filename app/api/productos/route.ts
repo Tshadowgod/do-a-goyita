@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { products } from "@/lib/db/schema";
 import { eq, ilike, or } from "drizzle-orm";
 import { z } from "zod";
+import { addLot } from "@/lib/inventory";
 
 const productSchema = z.object({
   name:        z.string().min(1),
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
 
     const [product] = await db.insert(products).values({
       ...data,
+      quantity: 0, // stock comes from lots
       price:    String(data.price),
       cost:     data.cost != null && data.cost !== 0 ? String(data.cost) : null,
       imageUrl: data.imageUrl  || null,
@@ -59,7 +61,13 @@ export async function POST(req: NextRequest) {
       category: data.category  || null,
     }).returning();
 
-    return NextResponse.json(product, { status: 201 });
+    // Initial stock becomes the first purchase lot
+    if (product && (data.quantity ?? 0) > 0) {
+      await addLot(product.id, data.quantity, data.cost ?? 0);
+    }
+
+    const [fresh] = await db.select().from(products).where(eq(products.id, product.id));
+    return NextResponse.json(fresh ?? product, { status: 201 });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: err.errors }, { status: 400 });

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { products } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { addLot } from "@/lib/inventory";
 
 const itemSchema = z.object({
   name:     z.string().min(1),
@@ -34,29 +35,28 @@ export async function POST(req: NextRequest) {
       const match = byName.get(key);
 
       if (match) {
-        // Existing product → add to stock and refresh cost/price
-        const newQty = (match.quantity ?? 0) + item.quantity;
-        await db.update(products)
-          .set({
-            quantity: newQty,
-            cost:     String(item.cost),
-            ...(item.price != null ? { price: String(item.price) } : {}),
-            updatedAt: new Date(),
-          })
-          .where(eq(products.id, match.id));
+        // Existing product → optionally refresh sale price, then add a purchase lot
+        if (item.price != null) {
+          await db.update(products)
+            .set({ price: String(item.price), updatedAt: new Date() })
+            .where(eq(products.id, match.id));
+        }
+        await addLot(match.id, item.quantity, item.cost);
         updated++;
         details.push({ name: match.name, action: "actualizado", quantity: item.quantity });
       } else {
-        // New product → sale price defaults to cost if not provided
+        // New product → create with 0 stock, then add the purchase lot
         const [inserted] = await db.insert(products).values({
           name:     item.name.trim(),
-          quantity: item.quantity,
+          quantity: 0,
           cost:     String(item.cost),
           price:    String(item.price ?? item.cost),
           unit:     "unidad",
         }).returning();
-        // keep map updated in case the same name appears twice in the list
-        if (inserted) byName.set(key, inserted);
+        if (inserted) {
+          byName.set(key, inserted);
+          await addLot(inserted.id, item.quantity, item.cost);
+        }
         created++;
         details.push({ name: item.name.trim(), action: "creado", quantity: item.quantity });
       }

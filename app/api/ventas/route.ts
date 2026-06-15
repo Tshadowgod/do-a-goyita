@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { sales, saleItems, products } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
+import { consumeFifo } from "@/lib/inventory";
 
 const saleItemSchema = z.object({
   productId: z.number().int().positive(),
@@ -44,10 +45,12 @@ export async function POST(req: NextRequest) {
       notes: data.notes ?? null,
     }).returning();
 
-    // get product names & deduct stock
+    // get product names, consume stock via FIFO and record COGS
     for (const item of data.items) {
       const [product] = await db.select().from(products).where(eq(products.id, item.productId));
       if (!product) continue;
+
+      const cogs = await consumeFifo(sale.id, item.productId, item.quantity);
 
       await db.insert(saleItems).values({
         saleId:      sale.id,
@@ -56,11 +59,8 @@ export async function POST(req: NextRequest) {
         quantity:    item.quantity,
         unitPrice:   String(item.unitPrice),
         subtotal:    String(item.unitPrice * item.quantity),
+        cost:        String(cogs),
       });
-
-      await db.update(products)
-        .set({ quantity: Math.max(0, (product.quantity ?? 0) - item.quantity), updatedAt: new Date() })
-        .where(eq(products.id, item.productId));
     }
 
     return NextResponse.json(sale, { status: 201 });

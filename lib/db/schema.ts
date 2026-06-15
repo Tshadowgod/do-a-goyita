@@ -44,6 +44,28 @@ export const saleItems = pgTable("sale_items", {
   quantity:    integer("quantity").notNull(),
   unitPrice:   numeric("unit_price", { precision: 10, scale: 2 }).notNull(),
   subtotal:    numeric("subtotal",   { precision: 10, scale: 2 }).notNull(),
+  cost:        numeric("cost",       { precision: 10, scale: 2 }).default("0"), // COGS (FIFO) for this line
+});
+
+// Inventory lots — each purchase creates a lot with its own cost (FIFO / PEPS)
+export const inventoryLots = pgTable("inventory_lots", {
+  id:           serial("id").primaryKey(),
+  productId:    integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  quantity:     integer("quantity").notNull(),   // original lot size
+  remaining:    integer("remaining").notNull(),  // remaining after FIFO consumption
+  unitCost:     numeric("unit_cost", { precision: 10, scale: 2 }).notNull(),
+  purchaseDate: date("purchase_date").notNull(),
+  createdAt:    timestamp("created_at").defaultNow(),
+});
+
+// Ledger of which lot each sale consumed (to restore stock on edit/delete)
+export const lotConsumptions = pgTable("lot_consumptions", {
+  id:        serial("id").primaryKey(),
+  saleId:    integer("sale_id").references(() => sales.id, { onDelete: "cascade" }).notNull(),
+  lotId:     integer("lot_id").references(() => inventoryLots.id, { onDelete: "set null" }),
+  productId: integer("product_id").references(() => products.id, { onDelete: "set null" }),
+  quantity:  integer("quantity").notNull(),
+  unitCost:  numeric("unit_cost", { precision: 10, scale: 2 }).notNull(),
 });
 
 export const expenses = pgTable("expenses", {
@@ -68,6 +90,11 @@ export const saleItemsRelations = relations(saleItems, ({ one }) => ({
 
 export const productsRelations = relations(products, ({ many }) => ({
   saleItems: many(saleItems),
+  lots:      many(inventoryLots),
+}));
+
+export const inventoryLotsRelations = relations(inventoryLots, ({ one }) => ({
+  product: one(products, { fields: [inventoryLots.productId], references: [products.id] }),
 }));
 
 export type Product  = typeof products.$inferSelect;
@@ -76,3 +103,5 @@ export type Sale     = typeof sales.$inferSelect;
 export type SaleItem = typeof saleItems.$inferSelect;
 export type Expense  = typeof expenses.$inferSelect;
 export type NewExpense = typeof expenses.$inferInsert;
+export type InventoryLot = typeof inventoryLots.$inferSelect;
+export type LotConsumption = typeof lotConsumptions.$inferSelect;

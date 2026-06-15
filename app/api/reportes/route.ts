@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { db } from "@/lib/db";
-import { sales, saleItems, products, expenses } from "@/lib/db/schema";
+import { sales, saleItems, expenses } from "@/lib/db/schema";
 import { gte, lte, and, eq } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { boliviaDayStart, boliviaDayEnd } from "@/lib/utils";
@@ -25,12 +25,11 @@ export async function GET(req: NextRequest) {
       count: sql<number>`COUNT(*)`,
     }).from(sales).where(conditions.length ? and(...conditions) : undefined);
 
-    // Cost of goods sold = sum(product cost * quantity sold) over the period
+    // Cost of goods sold = sum of the FIFO cost recorded on each sale line
     const [cogsRow] = await db.select({
-      total: sql<string>`COALESCE(SUM(${products.cost} * ${saleItems.quantity}), 0)`,
+      total: sql<string>`COALESCE(SUM(${saleItems.cost}), 0)`,
     }).from(saleItems)
       .innerJoin(sales, eq(saleItems.saleId, sales.id))
-      .innerJoin(products, eq(saleItems.productId, products.id))
       .where(conditions.length ? and(...conditions) : undefined);
 
     const [expensesTotal] = await db.select({

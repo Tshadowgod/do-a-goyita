@@ -24,19 +24,17 @@ export async function GET() {
       total: sql<string>`COALESCE(SUM(${sales.total}), 0)`,
     }).from(sales).where(gte(sales.createdAt, firstOfMonth));
 
-    // Cost of goods sold (today / this month)
+    // Cost of goods sold (FIFO cost recorded on each sale line)
     const [todayCogsRow] = await db.select({
-      total: sql<string>`COALESCE(SUM(${products.cost} * ${saleItems.quantity}), 0)`,
+      total: sql<string>`COALESCE(SUM(${saleItems.cost}), 0)`,
     }).from(saleItems)
       .innerJoin(sales, eq(saleItems.saleId, sales.id))
-      .innerJoin(products, eq(saleItems.productId, products.id))
       .where(gte(sales.createdAt, today));
 
     const [monthCogsRow] = await db.select({
-      total: sql<string>`COALESCE(SUM(${products.cost} * ${saleItems.quantity}), 0)`,
+      total: sql<string>`COALESCE(SUM(${saleItems.cost}), 0)`,
     }).from(saleItems)
       .innerJoin(sales, eq(saleItems.saleId, sales.id))
-      .innerJoin(products, eq(saleItems.productId, products.id))
       .where(gte(sales.createdAt, firstOfMonth));
 
     // Expenses this month
