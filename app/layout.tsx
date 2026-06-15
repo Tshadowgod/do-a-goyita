@@ -5,6 +5,7 @@ import { Toaster } from "react-hot-toast";
 export const metadata: Metadata = {
   title: "Doña Goyita | Sistema de Ventas",
   description: "Sistema POS para gestión de ventas e inventario",
+  icons: { icon: "/logo.png", apple: "/logo.png" },
 };
 
 export const viewport: Viewport = {

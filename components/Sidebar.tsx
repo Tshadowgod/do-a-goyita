@@ -8,7 +8,6 @@ import {
   Package,
   TrendingDown,
   BarChart2,
-  Store,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,9 +27,7 @@ export function Sidebar() {
     <aside className="hidden md:flex flex-col w-60 bg-slate-900 min-h-screen shrink-0">
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-800">
-        <div className="h-9 w-9 rounded-xl bg-brand-600 flex items-center justify-center">
-          <Store className="h-5 w-5 text-white" />
-        </div>
+        <img src="/logo.png" alt="Doña Goyita" className="h-10 w-10 rounded-xl object-cover bg-white" />
         <div>
           <p className="text-white font-bold text-sm leading-tight">Doña Goyita</p>
           <p className="text-slate-400 text-xs">Sistema de Ventas</p>
