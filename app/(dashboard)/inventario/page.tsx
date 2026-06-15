@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Search, Edit2, Trash2, AlertTriangle, Package } from "lucide-react";
+import { Plus, Upload, Search, Edit2, Trash2, AlertTriangle, Package } from "lucide-react";
 import toast from "react-hot-toast";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/Button";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { ProductModal } from "@/components/inventario/ProductModal";
+import { ImportModal } from "@/components/inventario/ImportModal";
 import { formatCurrency } from "@/lib/utils";
 import type { Product } from "@/lib/db/schema";
 
@@ -16,6 +17,7 @@ export default function InventarioPage() {
   const [loading,  setLoading]  = useState(true);
   const [query,    setQuery]    = useState("");
   const [modal,    setModal]    = useState(false);
+  const [importing, setImporting] = useState(false);
   const [editing,  setEditing]  = useState<Product | null>(null);
 
   const load = useCallback(async () => {
@@ -46,9 +48,14 @@ export default function InventarioPage() {
         title="Inventario"
         subtitle={`${products.length} productos`}
         action={
-          <Button onClick={() => { setEditing(null); setModal(true); }}>
-            <Plus className="h-4 w-4" /> Nuevo producto
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setImporting(true)}>
+              <Upload className="h-4 w-4" /> <span className="hidden sm:inline">Importar compras</span>
+            </Button>
+            <Button onClick={() => { setEditing(null); setModal(true); }}>
+              <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Nuevo producto</span>
+            </Button>
+          </div>
         }
       />
 
@@ -173,6 +180,12 @@ export default function InventarioPage() {
         onClose={() => setModal(false)}
         product={editing}
         onSaved={load}
+      />
+
+      <ImportModal
+        open={importing}
+        onClose={() => setImporting(false)}
+        onImported={load}
       />
     </div>
   );
