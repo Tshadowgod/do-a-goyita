@@ -78,6 +78,27 @@ export const expenses = pgTable("expenses", {
   createdAt:   timestamp("created_at").defaultNow(),
 });
 
+// Customer orders placed from the public storefront (/tienda)
+export const orders = pgTable("orders", {
+  id:           serial("id").primaryKey(),
+  customerName: varchar("customer_name", { length: 255 }).notNull(),
+  status:       varchar("status", { length: 20 }).notNull().default("pendiente"), // pendiente | confirmado | rechazado
+  total:        numeric("total", { precision: 10, scale: 2 }).notNull(),
+  notes:        text("notes"),
+  saleId:       integer("sale_id").references(() => sales.id, { onDelete: "set null" }),
+  createdAt:    timestamp("created_at").defaultNow(),
+});
+
+export const orderItems = pgTable("order_items", {
+  id:          serial("id").primaryKey(),
+  orderId:     integer("order_id").references(() => orders.id, { onDelete: "cascade" }).notNull(),
+  productId:   integer("product_id").references(() => products.id, { onDelete: "set null" }),
+  productName: varchar("product_name", { length: 255 }).notNull(),
+  quantity:    integer("quantity").notNull(),
+  unitPrice:   numeric("unit_price", { precision: 10, scale: 2 }).notNull(),
+  subtotal:    numeric("subtotal",   { precision: 10, scale: 2 }).notNull(),
+});
+
 // Relations
 export const salesRelations = relations(sales, ({ many }) => ({
   items: many(saleItems),
@@ -97,6 +118,14 @@ export const inventoryLotsRelations = relations(inventoryLots, ({ one }) => ({
   product: one(products, { fields: [inventoryLots.productId], references: [products.id] }),
 }));
 
+export const ordersRelations = relations(orders, ({ many }) => ({
+  items: many(orderItems),
+}));
+
+export const orderItemsRelations = relations(orderItems, ({ one }) => ({
+  order: one(orders, { fields: [orderItems.orderId], references: [orders.id] }),
+}));
+
 export type Product  = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
 export type Sale     = typeof sales.$inferSelect;
@@ -105,3 +134,5 @@ export type Expense  = typeof expenses.$inferSelect;
 export type NewExpense = typeof expenses.$inferInsert;
 export type InventoryLot = typeof inventoryLots.$inferSelect;
 export type LotConsumption = typeof lotConsumptions.$inferSelect;
+export type Order     = typeof orders.$inferSelect;
+export type OrderItem = typeof orderItems.$inferSelect;
