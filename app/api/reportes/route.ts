@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { sales, expenses } from "@/lib/db/schema";
 import { gte, lte, and } from "drizzle-orm";
 import { sql } from "drizzle-orm";
+import { boliviaDayStart, boliviaDayEnd } from "@/lib/utils";
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,8 +13,8 @@ export async function GET(req: NextRequest) {
     const to   = searchParams.get("to");
 
     const conditions = [];
-    if (from) conditions.push(gte(sales.createdAt, new Date(from)));
-    if (to)   conditions.push(lte(sales.createdAt, new Date(to)));
+    if (from) conditions.push(gte(sales.createdAt, boliviaDayStart(from)));
+    if (to)   conditions.push(lte(sales.createdAt, boliviaDayEnd(to)));
 
     const expConditions = [];
     if (from) expConditions.push(gte(expenses.date, from));

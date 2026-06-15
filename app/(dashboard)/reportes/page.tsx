@@ -105,7 +105,7 @@ export default function ReportesPage() {
                   <BarChart data={[{ name: "Período", Ingresos: data.salesTotal, Egresos: data.expensesTotal, Ganancia: Math.max(0, net) }]}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                     <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `L${v}`} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `Bs ${v}`} />
                     <Tooltip formatter={(v: number) => formatCurrency(v)} />
                     <Legend />
                     <Bar dataKey="Ingresos"  fill="#16a34a" radius={[6, 6, 0, 0]} />

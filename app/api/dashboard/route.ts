@@ -4,14 +4,15 @@ import { db } from "@/lib/db";
 import { sales, saleItems, expenses, products } from "@/lib/db/schema";
 import { gte, lte, and, eq, lt, count } from "drizzle-orm";
 import { sql } from "drizzle-orm";
-import { FIXED_EXPENSE_CATEGORIES } from "@/lib/utils";
+import { FIXED_EXPENSE_CATEGORIES, boliviaDayStart, boliviaToday } from "@/lib/utils";
 import type { DashboardStats, SalesChartPoint } from "@/types";
 
 export async function GET() {
   try {
-    const now   = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const todayStr        = boliviaToday();                 // "YYYY-MM-DD" in Bolivia
+    const today           = boliviaDayStart(todayStr);      // Bolivia midnight as UTC instant
+    const firstOfMonthStr = todayStr.slice(0, 8) + "01";
+    const firstOfMonth    = boliviaDayStart(firstOfMonthStr);
 
     // Sales today
     const todaySalesRows = await db.select({
@@ -26,14 +27,14 @@ export async function GET() {
     // Expenses this month
     const monthExpensesRows = await db.select({
       total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)`,
-    }).from(expenses).where(gte(expenses.date, firstOfMonth.toISOString().split("T")[0]));
+    }).from(expenses).where(gte(expenses.date, firstOfMonthStr));
 
     // Fixed expenses this month
     const fixedExpensesRows = await db.select({
       total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)`,
     }).from(expenses).where(
       and(
-        gte(expenses.date, firstOfMonth.toISOString().split("T")[0]),
+        gte(expenses.date, firstOfMonthStr),
         sql`${expenses.category} = ANY(${JSON.stringify(FIXED_EXPENSE_CATEGORIES)}::text[])`,
       )
     );
@@ -56,15 +57,15 @@ export async function GET() {
       ? ((salesThisMonth - breakEvenRevenue) / salesThisMonth) * 100
       : 0;
 
-    // Chart data – last 30 days
+    // Chart data – last 30 days (Bolivia calendar days)
     const chart: SalesChartPoint[] = [];
+    const labelBase = new Date(`${todayStr}T00:00:00Z`); // label anchor (UTC, no DST)
+    const DAY = 86400000;
     for (let i = 29; i >= 0; i--) {
-      const dayStart = new Date(today);
-      dayStart.setDate(today.getDate() - i);
-      const dayEnd = new Date(dayStart);
-      dayEnd.setDate(dayStart.getDate() + 1);
-
-      const dayStr = dayStart.toISOString().split("T")[0];
+      const dayStr     = new Date(labelBase.getTime() - i * DAY).toISOString().split("T")[0];
+      const nextDayStr = new Date(labelBase.getTime() - (i - 1) * DAY).toISOString().split("T")[0];
+      const dayStart   = boliviaDayStart(dayStr);
+      const dayEnd     = boliviaDayStart(nextDayStr);
 
       const [dayS] = await db.select({
         total: sql<string>`COALESCE(SUM(${sales.total}), 0)`,
