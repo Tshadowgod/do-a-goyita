@@ -27,6 +27,6 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Run on everything except Next internals and the logo asset
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|logo.png).*)"],
+  // Run on everything except Next internals, the logo asset, and public product images
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|logo.png|productos).*)"],
 };
