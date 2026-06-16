@@ -20,7 +20,7 @@ export default function TiendaPage() {
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [query,    setQuery]    = useState("");
-  const [cat,      setCat]      = useState("Todos");
+  const [cat,      setCat]      = useState("");  // "" hasta cargar; luego la 1ra categoría
   const [cart,     setCart]     = useState<Line[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [name,     setName]     = useState("");
@@ -55,17 +55,25 @@ export default function TiendaPage() {
     return [...set].sort((a, b) => catRank(a) - catRank(b) || a.localeCompare(b));
   }, [products]);
 
-  // Productos agrupados por categoría, respetando búsqueda y filtro de categoría.
+  // Al cargar, abre directamente en la primera categoría (pestaña activa).
+  useEffect(() => {
+    if (!cat && categories.length) setCat(categories[0]);
+  }, [categories, cat]);
+
+  // Al buscar, se muestran TODAS las categorías que coincidan (ignora la pestaña).
+  const searching = query.trim() !== "";
+
+  // Productos agrupados por categoría, respetando búsqueda y pestaña activa.
   const grouped = useMemo(() => {
     const map = new Map<string, StoreProduct[]>();
     for (const p of filtered) {
       const c = catName(p.category);
-      if (cat !== "Todos" && c !== cat) continue;
+      if (!searching && cat && c !== cat) continue;
       if (!map.has(c)) map.set(c, []);
       map.get(c)!.push(p);
     }
     return [...map.entries()].sort((a, b) => catRank(a[0]) - catRank(b[0]) || a[0].localeCompare(b[0]));
-  }, [filtered, cat]);
+  }, [filtered, cat, searching]);
 
   const cartCount = cart.reduce((s, l) => s + l.quantity, 0);
   const total     = cart.reduce((s, l) => s + l.price * l.quantity, 0);
@@ -164,16 +172,16 @@ export default function TiendaPage() {
           />
         </div>
 
-        {/* Filtro por categoría */}
+        {/* Pestañas por categoría */}
         {!loading && categories.length > 1 && (
           <div className="flex gap-2 overflow-x-auto pb-1 mt-3 -mx-1 px-1">
-            {["Todos", ...categories].map((c) => (
+            {categories.map((c) => (
               <button
                 key={c}
-                onClick={() => setCat(c)}
-                className={`whitespace-nowrap px-3.5 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                  cat === c
-                    ? "bg-brand-600 text-white border-brand-600"
+                onClick={() => { setCat(c); setQuery(""); }}
+                className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-semibold border transition-colors ${
+                  !searching && cat === c
+                    ? "bg-brand-600 text-white border-brand-600 shadow-sm"
                     : "bg-white text-slate-600 border-slate-300 hover:border-brand-400"
                 }`}
               >
@@ -197,9 +205,11 @@ export default function TiendaPage() {
           <div className="max-w-5xl mx-auto space-y-7">
             {grouped.map(([c, items]) => (
               <section key={c}>
-                <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-2.5 px-1">
-                  {c} <span className="text-slate-400 font-normal normal-case">· {items.length}</span>
-                </h2>
+                {(searching || grouped.length > 1) && (
+                  <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-2.5 px-1">
+                    {c} <span className="text-slate-400 font-normal normal-case">· {items.length}</span>
+                  </h2>
+                )}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {items.map((p) => (
                     <div key={p.id} className="bg-white rounded-2xl border border-slate-200 p-3 flex flex-col">
