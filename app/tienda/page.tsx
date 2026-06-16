@@ -20,6 +20,7 @@ export default function TiendaPage() {
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [query,    setQuery]    = useState("");
+  const [cat,      setCat]      = useState("Todos");
   const [cart,     setCart]     = useState<Line[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [name,     setName]     = useState("");
@@ -42,6 +43,29 @@ export default function TiendaPage() {
     () => products.filter((p) => !query || p.name.toLowerCase().includes(query.toLowerCase())),
     [products, query],
   );
+
+  // Orden preferido de categorías; el resto va al final, "Otros" siempre último.
+  const CAT_ORDER = ["Limpieza", "Cuidado del cabello", "Cuidado personal", "Hogar", "Bebidas", "Otros"];
+  const catName = (c: string | null) => (c && c.trim() ? c.trim() : "Otros");
+  const catRank = (c: string) => { const i = CAT_ORDER.indexOf(c); return i < 0 ? 98 : i; };
+
+  // Lista de categorías existentes (para los botones de filtro).
+  const categories = useMemo(() => {
+    const set = new Set(products.map((p) => catName(p.category)));
+    return [...set].sort((a, b) => catRank(a) - catRank(b) || a.localeCompare(b));
+  }, [products]);
+
+  // Productos agrupados por categoría, respetando búsqueda y filtro de categoría.
+  const grouped = useMemo(() => {
+    const map = new Map<string, StoreProduct[]>();
+    for (const p of filtered) {
+      const c = catName(p.category);
+      if (cat !== "Todos" && c !== cat) continue;
+      if (!map.has(c)) map.set(c, []);
+      map.get(c)!.push(p);
+    }
+    return [...map.entries()].sort((a, b) => catRank(a[0]) - catRank(b[0]) || a[0].localeCompare(b[0]));
+  }, [filtered, cat]);
 
   const cartCount = cart.reduce((s, l) => s + l.quantity, 0);
   const total     = cart.reduce((s, l) => s + l.price * l.quantity, 0);
@@ -139,34 +163,62 @@ export default function TiendaPage() {
             className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
+
+        {/* Filtro por categoría */}
+        {!loading && categories.length > 1 && (
+          <div className="flex gap-2 overflow-x-auto pb-1 mt-3 -mx-1 px-1">
+            {["Todos", ...categories].map((c) => (
+              <button
+                key={c}
+                onClick={() => setCat(c)}
+                className={`whitespace-nowrap px-3.5 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                  cat === c
+                    ? "bg-brand-600 text-white border-brand-600"
+                    : "bg-white text-slate-600 border-slate-300 hover:border-brand-400"
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Products */}
       <div className="px-4 pb-24">
         {loading ? (
           <div className="flex justify-center py-16"><div className="animate-spin h-8 w-8 border-4 border-brand-600 border-t-transparent rounded-full" /></div>
-        ) : filtered.length === 0 ? (
+        ) : grouped.length === 0 ? (
           <div className="flex flex-col items-center py-16 text-slate-400">
             <Store className="h-12 w-12 mb-2 opacity-40" />
             <p className="text-sm">No hay productos disponibles</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-w-5xl mx-auto">
-            {filtered.map((p) => (
-              <div key={p.id} className="bg-white rounded-2xl border border-slate-200 p-3 flex flex-col">
-                {p.imageUrl ? (
-                  <img src={p.imageUrl} alt={p.name} className="w-full h-28 object-cover rounded-xl mb-2" />
-                ) : (
-                  <div className="w-full h-28 bg-slate-100 rounded-xl mb-2 flex items-center justify-center">
-                    <Store className="h-8 w-8 text-slate-300" />
-                  </div>
-                )}
-                <p className="text-sm font-semibold text-slate-900 line-clamp-2 leading-tight flex-1">{p.name}</p>
-                <p className="text-base font-bold text-brand-700 mt-1">{formatCurrency(p.price)}</p>
-                <button onClick={() => add(p)} className="mt-2 w-full bg-brand-600 hover:bg-brand-700 text-white rounded-xl py-2 text-sm font-medium flex items-center justify-center gap-1">
-                  <Plus className="h-4 w-4" /> Agregar
-                </button>
-              </div>
+          <div className="max-w-5xl mx-auto space-y-7">
+            {grouped.map(([c, items]) => (
+              <section key={c}>
+                <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-2.5 px-1">
+                  {c} <span className="text-slate-400 font-normal normal-case">· {items.length}</span>
+                </h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {items.map((p) => (
+                    <div key={p.id} className="bg-white rounded-2xl border border-slate-200 p-3 flex flex-col">
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt={p.name} className="w-full h-28 object-cover rounded-xl mb-2" />
+                      ) : (
+                        <div className="w-full h-28 bg-slate-100 rounded-xl mb-2 flex items-center justify-center">
+                          <Store className="h-8 w-8 text-slate-300" />
+                        </div>
+                      )}
+                      <p className="text-sm font-semibold text-slate-900 line-clamp-2 leading-tight flex-1">{p.name}</p>
+                      <p className="text-base font-bold text-brand-700 mt-1">{formatCurrency(p.price)}</p>
+                      <button onClick={() => add(p)} className="mt-2 w-full bg-brand-600 hover:bg-brand-700 text-white rounded-xl py-2 text-sm font-medium flex items-center justify-center gap-1">
+                        <Plus className="h-4 w-4" /> Agregar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         )}
