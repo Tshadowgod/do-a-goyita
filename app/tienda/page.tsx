@@ -68,7 +68,7 @@ export default function TiendaPage() {
     const map = new Map<string, StoreProduct[]>();
     for (const p of filtered) {
       const c = catName(p.category);
-      if (!searching && cat && c !== cat) continue;
+      if (!searching && cat && cat !== "Todos" && c !== cat) continue;
       if (!map.has(c)) map.set(c, []);
       map.get(c)!.push(p);
     }
@@ -175,7 +175,7 @@ export default function TiendaPage() {
         {/* Pestañas por categoría */}
         {!loading && categories.length > 1 && (
           <div className="flex gap-2 overflow-x-auto pb-1 mt-3 -mx-1 px-1">
-            {categories.map((c) => (
+            {["Todos", ...categories].map((c) => (
               <button
                 key={c}
                 onClick={() => { setCat(c); setQuery(""); }}
