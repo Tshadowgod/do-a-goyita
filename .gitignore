@@ -41,3 +41,7 @@ next-env.d.ts
 drizzle/
 
 .vercel
+
+# fotos originales y scripts locales de edicion de imagen
+/FOTOS
+*.py
