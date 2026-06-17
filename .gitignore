@@ -45,3 +45,4 @@ drizzle/
 # fotos originales y scripts locales de edicion de imagen
 /FOTOS
 *.py
+proc_nuevos.log

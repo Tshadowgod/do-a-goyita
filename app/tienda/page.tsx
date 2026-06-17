@@ -45,7 +45,7 @@ export default function TiendaPage() {
   );
 
   // Orden preferido de categorías; el resto va al final, "Otros" siempre último.
-  const CAT_ORDER = ["Limpieza", "Cuidado del cabello", "Cuidado personal", "Hogar", "Bebidas", "Otros"];
+  const CAT_ORDER = ["Despensa", "Galletas y dulces", "Bebidas e infusiones", "Aceites y condimentos", "Enlatados y conservas", "Untables y mermeladas", "Limpieza", "Cuidado del cabello", "Cuidado personal", "Hogar", "Cigarrillos", "Bebidas", "Otros"];
   const catName = (c: string | null) => (c && c.trim() ? c.trim() : "Otros");
   const catRank = (c: string) => { const i = CAT_ORDER.indexOf(c); return i < 0 ? 98 : i; };
 
