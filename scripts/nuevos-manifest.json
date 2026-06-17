@@ -75,5 +75,8 @@
   { "id": "1781714441221", "slug": "vinagre-blanco-su-ssana",     "name": "Vinagre Blanco Su Ssana",                       "category": "Aceites y condimentos",  "unit": "unidad",  "description": "Vinagre blanco Su Ssana." },
   { "id": "1781714441255", "slug": "lavavajilla-de-rosa",         "name": "Lavavajilla Líquido De Rosa",                   "category": "Limpieza",               "unit": "unidad",  "description": "Detergente lavavajilla líquido De Rosa." },
   { "id": "1781714441294", "slug": "vinagre-manzana",             "name": "Vinagre de Manzana",                            "category": "Aceites y condimentos",  "unit": "unidad",  "description": "Vinagre de manzana." },
-  { "id": "1781714441364", "slug": "salsa-soya-sakura",           "name": "Salsa de Soya Sakura",                          "category": "Aceites y condimentos",  "unit": "unidad",  "description": "Salsa de soya Sakura." }
+  { "id": "1781714441364", "slug": "salsa-soya-sakura",           "name": "Salsa de Soya Sakura",                          "category": "Aceites y condimentos",  "unit": "unidad",  "description": "Salsa de soya Sakura." },
+  { "id": "1781714438021", "slug": "galletas-cremositas-2",        "name": "Galletas Cremositas (Vainilla y Chocolate)",    "category": "Galletas y dulces",      "unit": "unidad",  "description": "Galletas rellenas Cremositas, sabores vainilla y chocolate." },
+  { "id": "1781714439501", "slug": "rosquitas-mabels-bis-2",       "name": "Rosquitas Mabel's Bis (2)",                     "category": "Galletas y dulces",      "unit": "unidad",  "description": "Rosquitas Mabel's Bis." },
+  { "id": "1781714441329", "slug": "salsa-soya-sakura-2",          "name": "Salsa de Soya Sakura (2)",                      "category": "Aceites y condimentos",  "unit": "unidad",  "description": "Salsa de soya Sakura." }
 ]
