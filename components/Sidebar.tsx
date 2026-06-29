@@ -10,6 +10,7 @@ import {
   TrendingDown,
   BarChart2,
   LogOut,
+  Truck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,8 +29,9 @@ const NAV = [
   { href: "/pedidos",    label: "Pedidos",           icon: ClipboardList },
   { href: "/ventas",     label: "Ventas",            icon: Receipt },
   { href: "/inventario", label: "Inventario",        icon: Package },
-  { href: "/egresos",    label: "Egresos",           icon: TrendingDown },
-  { href: "/reportes",   label: "Reportes",          icon: BarChart2 },
+  { href: "/egresos",      label: "Egresos",           icon: TrendingDown },
+  { href: "/proveedores", label: "Proveedores",       icon: Truck },
+  { href: "/reportes",    label: "Reportes",          icon: BarChart2 },
 ];
 
 export function Sidebar() {

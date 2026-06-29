@@ -68,6 +68,18 @@ export const lotConsumptions = pgTable("lot_consumptions", {
   unitCost:  numeric("unit_cost", { precision: 10, scale: 2 }).notNull(),
 });
 
+export const suppliers = pgTable("suppliers", {
+  id:        serial("id").primaryKey(),
+  name:      varchar("name", { length: 255 }).notNull(),
+  contact:   varchar("contact", { length: 255 }),
+  phone:     varchar("phone", { length: 50 }),
+  email:     varchar("email", { length: 255 }),
+  address:   text("address"),
+  notes:     text("notes"),
+  active:    boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const expenses = pgTable("expenses", {
   id:          serial("id").primaryKey(),
   amount:      numeric("amount", { precision: 10, scale: 2 }).notNull(),
@@ -136,3 +148,5 @@ export type InventoryLot = typeof inventoryLots.$inferSelect;
 export type LotConsumption = typeof lotConsumptions.$inferSelect;
 export type Order     = typeof orders.$inferSelect;
 export type OrderItem = typeof orderItems.$inferSelect;
+export type Supplier  = typeof suppliers.$inferSelect;
+export type NewSupplier = typeof suppliers.$inferInsert;
