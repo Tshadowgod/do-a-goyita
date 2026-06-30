@@ -68,6 +68,26 @@ export const lotConsumptions = pgTable("lot_consumptions", {
   unitCost:  numeric("unit_cost", { precision: 10, scale: 2 }).notNull(),
 });
 
+export const debtors = pgTable("debtors", {
+  id:        serial("id").primaryKey(),
+  name:      varchar("name", { length: 255 }).notNull(),
+  phone:     varchar("phone", { length: 50 }),
+  notes:     text("notes"),
+  active:    boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const fios = pgTable("fios", {
+  id:          serial("id").primaryKey(),
+  debtorId:    integer("debtor_id").references(() => debtors.id, { onDelete: "cascade" }).notNull(),
+  amount:      numeric("amount", { precision: 10, scale: 2 }).notNull(),
+  description: text("description").notNull(),
+  date:        date("date").notNull(),
+  paid:        boolean("paid").default(false),
+  paidAt:      timestamp("paid_at"),
+  createdAt:   timestamp("created_at").defaultNow(),
+});
+
 export const suppliers = pgTable("suppliers", {
   id:        serial("id").primaryKey(),
   name:      varchar("name", { length: 255 }).notNull(),
@@ -148,5 +168,7 @@ export type InventoryLot = typeof inventoryLots.$inferSelect;
 export type LotConsumption = typeof lotConsumptions.$inferSelect;
 export type Order     = typeof orders.$inferSelect;
 export type OrderItem = typeof orderItems.$inferSelect;
-export type Supplier  = typeof suppliers.$inferSelect;
+export type Supplier    = typeof suppliers.$inferSelect;
 export type NewSupplier = typeof suppliers.$inferInsert;
+export type Debtor      = typeof debtors.$inferSelect;
+export type Fio         = typeof fios.$inferSelect;

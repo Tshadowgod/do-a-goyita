@@ -11,6 +11,7 @@ import {
   BarChart2,
   LogOut,
   Truck,
+  HandCoins,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +32,7 @@ const NAV = [
   { href: "/inventario", label: "Inventario",        icon: Package },
   { href: "/egresos",      label: "Egresos",           icon: TrendingDown },
   { href: "/proveedores", label: "Proveedores",       icon: Truck },
+  { href: "/fios",        label: "Fíos",              icon: HandCoins },
   { href: "/reportes",    label: "Reportes",          icon: BarChart2 },
 ];
 
