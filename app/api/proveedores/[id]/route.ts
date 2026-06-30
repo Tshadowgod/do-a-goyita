@@ -14,9 +14,10 @@ const updateSchema = z.object({
   notes:   z.string().optional(),
 });
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = Number(params.id);
+    const { id: idStr } = await params;
+    const id = Number(idStr);
     const body = await req.json();
     const data = updateSchema.parse(body);
     const [row] = await db.update(suppliers).set({
@@ -38,9 +39,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = Number(params.id);
+    const { id: idStr } = await params;
+    const id = Number(idStr);
     await db.update(suppliers).set({ active: false }).where(eq(suppliers.id, id));
     return NextResponse.json({ ok: true });
   } catch (err) {
