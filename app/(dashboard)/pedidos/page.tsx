@@ -1,13 +1,14 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-import { ClipboardList, Check, X, Trash2, Copy, ClipboardCheck } from "lucide-react";
+import { ClipboardList, Check, X, Trash2, Copy, ClipboardCheck, HandCoins } from "lucide-react";
 import toast from "react-hot-toast";
 import { Header } from "@/components/Header";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
-import type { Order, OrderItem } from "@/lib/db/schema";
+import type { Order, OrderItem, Debtor } from "@/lib/db/schema";
 
 type OrderWithItems = Order & { items: OrderItem[] };
 
@@ -18,11 +19,17 @@ const statusBadge = (s: string) => {
 };
 
 export default function PedidosPage() {
-  const [orders,  setOrders]  = useState<OrderWithItems[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [busy,    setBusy]    = useState<number | null>(null);
-  const [copied,  setCopied]  = useState(false);
-  const [storeUrl, setStoreUrl] = useState("/tienda");
+  const [orders,    setOrders]    = useState<OrderWithItems[]>([]);
+  const [loading,   setLoading]   = useState(true);
+  const [busy,      setBusy]      = useState<number | null>(null);
+  const [copied,    setCopied]    = useState(false);
+  const [storeUrl,  setStoreUrl]  = useState("/tienda");
+
+  // Fío modal state
+  const [fioOrder,    setFioOrder]    = useState<OrderWithItems | null>(null);
+  const [debtors,     setDebtors]     = useState<Debtor[]>([]);
+  const [selectedId,  setSelectedId]  = useState<number | "new" | null>(null);
+  const [newName,     setNewName]     = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -33,6 +40,14 @@ export default function PedidosPage() {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { setStoreUrl(`${window.location.origin}/tienda`); }, []);
+
+  // Load debtors when fío modal opens
+  useEffect(() => {
+    if (!fioOrder) return;
+    fetch("/api/fios").then((r) => r.json()).then(setDebtors);
+    setSelectedId(null);
+    setNewName(fioOrder.customerName);
+  }, [fioOrder]);
 
   async function act(order: OrderWithItems, action: "confirmar" | "rechazar") {
     if (action === "rechazar" && !confirm(`¿Rechazar el pedido de ${order.customerName}?`)) return;
@@ -46,6 +61,32 @@ export default function PedidosPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Error");
       toast.success(action === "confirmar" ? "Pedido confirmado y venta registrada" : "Pedido rechazado");
+      load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleFiar() {
+    if (!fioOrder) return;
+    const isNew = selectedId === "new" || selectedId === null;
+    if (isNew && !newName.trim()) { toast.error("Ingresa el nombre de la persona"); return; }
+    setBusy(fioOrder.id);
+    try {
+      const body = isNew
+        ? { action: "fiar", debtorName: newName.trim() }
+        : { action: "fiar", debtorId: selectedId as number };
+      const res = await fetch(`/api/pedidos/${fioOrder.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Error");
+      toast.success("Pedido fiado — registrado en Fíos");
+      setFioOrder(null);
       load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error");
@@ -124,14 +165,21 @@ export default function PedidosPage() {
 
               {o.notes && <p className="mt-2 text-xs text-slate-500 italic">Nota: {o.notes}</p>}
 
-              <div className="mt-3 flex gap-2 justify-end">
+              <div className="mt-3 flex gap-2 justify-end flex-wrap">
                 {o.status === "pendiente" ? (
                   <>
                     <Button variant="outline" onClick={() => act(o, "rechazar")} disabled={busy === o.id}>
                       <X className="h-4 w-4" /> Rechazar
                     </Button>
+                    <button
+                      onClick={() => setFioOrder(o)}
+                      disabled={busy === o.id}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors disabled:opacity-50"
+                    >
+                      <HandCoins className="h-4 w-4" /> Fiar
+                    </button>
                     <Button onClick={() => act(o, "confirmar")} loading={busy === o.id}>
-                      <Check className="h-4 w-4" /> Confirmar
+                      <Check className="h-4 w-4" /> Cobrar
                     </Button>
                   </>
                 ) : (
@@ -144,6 +192,82 @@ export default function PedidosPage() {
           ))}
         </div>
       )}
+
+      {/* Fío modal */}
+      <Modal
+        open={fioOrder !== null}
+        onClose={() => setFioOrder(null)}
+        title={`Fiar pedido de ${fioOrder?.customerName ?? ""}`}
+        size="md"
+      >
+        {fioOrder && (
+          <div className="space-y-4">
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-100 flex justify-between">
+              <span className="text-sm text-amber-700 font-medium">Total a fiar</span>
+              <span className="font-bold text-amber-800">{formatCurrency(fioOrder.total)}</span>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium text-slate-700 mb-2">¿A quién se fía?</p>
+
+              {/* Existing debtors */}
+              {debtors.length > 0 && (
+                <div className="space-y-1.5 mb-3 max-h-40 overflow-y-auto">
+                  {debtors.map((d) => (
+                    <button
+                      key={d.id}
+                      onClick={() => setSelectedId(d.id)}
+                      className={`w-full text-left px-3 py-2.5 rounded-xl border text-sm transition-colors ${
+                        selectedId === d.id
+                          ? "border-brand-500 bg-brand-50 text-brand-800 font-medium"
+                          : "border-slate-200 hover:border-slate-300 text-slate-700"
+                      }`}
+                    >
+                      {d.name}
+                      {d.phone && <span className="text-xs text-slate-400 ml-2">{d.phone}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* New person option */}
+              <button
+                onClick={() => setSelectedId("new")}
+                className={`w-full text-left px-3 py-2.5 rounded-xl border text-sm transition-colors ${
+                  selectedId === "new" || selectedId === null
+                    ? "border-brand-500 bg-brand-50 text-brand-800 font-medium"
+                    : "border-dashed border-slate-300 hover:border-slate-400 text-slate-500"
+                }`}
+              >
+                + Persona nueva
+              </button>
+
+              {(selectedId === "new" || selectedId === null) && (
+                <div className="mt-2">
+                  <input
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Nombre de la persona"
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <Button variant="outline" className="flex-1" onClick={() => setFioOrder(null)}>Cancelar</Button>
+              <Button
+                className="flex-1"
+                onClick={handleFiar}
+                disabled={busy === fioOrder?.id}
+              >
+                <HandCoins className="h-4 w-4" />
+                {busy === fioOrder?.id ? "Guardando..." : "Confirmar fío"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

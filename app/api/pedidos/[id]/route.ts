@@ -1,21 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { db } from "@/lib/db";
-import { orders, orderItems, sales, saleItems, products } from "@/lib/db/schema";
+import { orders, orderItems, sales, saleItems, products, debtors, fios } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { consumeFifo } from "@/lib/inventory";
 
 const actionSchema = z.object({
-  action: z.enum(["confirmar", "rechazar"]),
+  action:      z.enum(["confirmar", "rechazar", "fiar"]),
   paymentMethod: z.string().optional(),
+  debtorId:    z.number().int().positive().optional(),
+  debtorName:  z.string().optional(),
 });
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const orderId = parseInt(id);
-    const { action, paymentMethod } = actionSchema.parse(await req.json());
+    const { action, paymentMethod, debtorId, debtorName } = actionSchema.parse(await req.json());
 
     const order = await db.query.orders.findFirst({
       where: eq(orders.id, orderId),
@@ -52,10 +54,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     const total = order.items.reduce((s, i) => s + parseFloat(i.subtotal), 0);
+
+    // Determine payment method and whether this is a fío
+    const isFio = action === "fiar";
+    const method = isFio ? "fío" : (paymentMethod ?? "efectivo");
+
     const [sale] = await db.insert(sales).values({
       total:         String(total),
-      paymentMethod: paymentMethod ?? "efectivo",
-      notes:         `Pedido en línea de ${order.customerName}`,
+      paymentMethod: method,
+      notes:         `Pedido en línea de ${order.customerName}${isFio ? " (fío)" : ""}`,
     }).returning();
 
     for (const item of order.items) {
@@ -69,6 +76,22 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         unitPrice:   item.unitPrice,
         subtotal:    item.subtotal,
         cost:        String(cogs),
+      });
+    }
+
+    // If fío: look up or create debtor, then register the fío
+    if (isFio) {
+      let dId = debtorId;
+      if (!dId) {
+        const name = debtorName?.trim() || order.customerName;
+        const [newDebtor] = await db.insert(debtors).values({ name }).returning();
+        dId = newDebtor.id;
+      }
+      await db.insert(fios).values({
+        debtorId:    dId,
+        amount:      String(total),
+        description: `Pedido #${orderId} — ${order.items.map((i) => `${i.quantity}× ${i.productName}`).join(", ")}`,
+        date:        new Date().toISOString().slice(0, 10),
       });
     }
 
