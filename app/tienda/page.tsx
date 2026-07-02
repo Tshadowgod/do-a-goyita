@@ -19,6 +19,7 @@ interface Line { productId: number; name: string; price: number; quantity: numbe
 export default function TiendaPage() {
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [loading,  setLoading]  = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [query,    setQuery]    = useState("");
   const [cat,      setCat]      = useState("");  // "" hasta cargar; luego la 1ra categoría
   const [cart,     setCart]     = useState<Line[]>([]);
@@ -30,9 +31,14 @@ export default function TiendaPage() {
 
   async function load() {
     setLoading(true);
+    setLoadError(false);
     try {
       const res = await fetch("/api/tienda/productos");
-      setProducts(await res.json());
+      const data = await res.json();
+      if (!res.ok || !Array.isArray(data)) throw new Error();
+      setProducts(data);
+    } catch {
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -47,7 +53,7 @@ export default function TiendaPage() {
   // Orden preferido de categorías; el resto va al final, "Otros" siempre último.
   const CAT_ORDER = ["Despensa", "Galletas y dulces", "Bebidas e infusiones", "Aceites y condimentos", "Enlatados y conservas", "Untables y mermeladas", "Limpieza", "Cuidado del cabello", "Cuidado personal", "Hogar", "Cigarrillos", "Bebidas", "Otros"];
   const catName = (c: string | null) => (c && c.trim() ? c.trim() : "Otros");
-  const catRank = (c: string) => { const i = CAT_ORDER.indexOf(c); return i < 0 ? 98 : i; };
+  const catRank = (c: string) => { if (c === "Otros") return 99; const i = CAT_ORDER.indexOf(c); return i < 0 ? 98 : i; };
 
   // Lista de categorías existentes (para los botones de filtro).
   const categories = useMemo(() => {
@@ -62,6 +68,15 @@ export default function TiendaPage() {
 
   // Al buscar, se muestran TODAS las categorías que coincidan (ignora la pestaña).
   const searching = query.trim() !== "";
+
+  // Con el carrito abierto: bloquea el scroll del fondo y permite cerrar con Escape.
+  useEffect(() => {
+    if (!cartOpen) return;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setCartOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = ""; window.removeEventListener("keydown", onKey); };
+  }, [cartOpen]);
 
   // Productos agrupados por categoría, respetando búsqueda y pestaña activa.
   const grouped = useMemo(() => {
@@ -152,7 +167,7 @@ export default function TiendaPage() {
           <p className="font-bold text-slate-900">Doña Goyita</p>
           <p className="text-xs text-slate-400">Haz tu pedido en línea</p>
         </div>
-        <button onClick={() => setCartOpen(true)} className="relative bg-brand-600 text-white rounded-xl p-2.5">
+        <button onClick={() => setCartOpen(true)} aria-label="Ver carrito" className="relative bg-brand-600 text-white rounded-xl p-2.5">
           <ShoppingCart className="h-5 w-5" />
           {cartCount > 0 && (
             <span className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">{cartCount}</span>
@@ -196,10 +211,23 @@ export default function TiendaPage() {
       <div className="px-4 pb-24">
         {loading ? (
           <div className="flex justify-center py-16"><div className="animate-spin h-8 w-8 border-4 border-brand-600 border-t-transparent rounded-full" /></div>
+        ) : loadError ? (
+          <div className="flex flex-col items-center py-16 text-slate-400">
+            <Store className="h-12 w-12 mb-2 opacity-40" />
+            <p className="text-sm">No se pudieron cargar los productos</p>
+            <button onClick={load} className="mt-4 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-medium">
+              Reintentar
+            </button>
+          </div>
         ) : grouped.length === 0 ? (
           <div className="flex flex-col items-center py-16 text-slate-400">
             <Store className="h-12 w-12 mb-2 opacity-40" />
-            <p className="text-sm">No hay productos disponibles</p>
+            <p className="text-sm">{searching ? `No se encontró “${query.trim()}”` : "No hay productos disponibles"}</p>
+            {searching && (
+              <button onClick={() => setQuery("")} className="mt-3 text-sm text-brand-600 font-medium hover:underline">
+                Ver todos los productos
+              </button>
+            )}
           </div>
         ) : (
           <div className="max-w-5xl mx-auto space-y-7">
@@ -211,22 +239,40 @@ export default function TiendaPage() {
                   </h2>
                 )}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {items.map((p) => (
-                    <div key={p.id} className="bg-white rounded-2xl border border-slate-200 p-3 flex flex-col">
-                      {p.imageUrl ? (
-                        <img src={p.imageUrl} alt={p.name} className="w-full h-28 object-cover rounded-xl mb-2" />
-                      ) : (
-                        <div className="w-full h-28 bg-slate-100 rounded-xl mb-2 flex items-center justify-center">
-                          <Store className="h-8 w-8 text-slate-300" />
+                  {items.map((p) => {
+                    const line = cart.find((l) => l.productId === p.id);
+                    return (
+                      <div key={p.id} className="bg-white rounded-2xl border border-slate-200 p-3 flex flex-col">
+                        {p.imageUrl ? (
+                          <img src={p.imageUrl} alt={p.name} loading="lazy" className="w-full h-28 object-cover rounded-xl mb-2" />
+                        ) : (
+                          <div className="w-full h-28 bg-slate-100 rounded-xl mb-2 flex items-center justify-center">
+                            <Store className="h-8 w-8 text-slate-300" />
+                          </div>
+                        )}
+                        <p className="text-sm font-semibold text-slate-900 line-clamp-2 leading-tight flex-1">{p.name}</p>
+                        <div className="flex items-baseline justify-between gap-1 mt-1">
+                          <p className="text-base font-bold text-brand-700">{formatCurrency(p.price)}</p>
+                          {p.quantity <= 5 && (
+                            <span className="text-[11px] font-medium text-amber-600 whitespace-nowrap">
+                              {p.quantity === 1 ? "¡Último!" : `Quedan ${p.quantity}`}
+                            </span>
+                          )}
                         </div>
-                      )}
-                      <p className="text-sm font-semibold text-slate-900 line-clamp-2 leading-tight flex-1">{p.name}</p>
-                      <p className="text-base font-bold text-brand-700 mt-1">{formatCurrency(p.price)}</p>
-                      <button onClick={() => add(p)} className="mt-2 w-full bg-brand-600 hover:bg-brand-700 text-white rounded-xl py-2 text-sm font-medium flex items-center justify-center gap-1">
-                        <Plus className="h-4 w-4" /> Agregar
-                      </button>
-                    </div>
-                  ))}
+                        {line ? (
+                          <div className="mt-2 flex items-center justify-between bg-brand-50 border border-brand-200 rounded-xl p-1">
+                            <button onClick={() => setQty(p.id, line.quantity - 1)} aria-label={`Quitar un ${p.name}`} className="h-8 w-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center"><Minus className="h-4 w-4" /></button>
+                            <span className="text-sm font-bold text-brand-700">{line.quantity}</span>
+                            <button onClick={() => add(p)} disabled={line.quantity >= p.quantity} aria-label={`Agregar un ${p.name}`} className="h-8 w-8 rounded-lg bg-brand-600 text-white flex items-center justify-center disabled:opacity-40"><Plus className="h-4 w-4" /></button>
+                          </div>
+                        ) : (
+                          <button onClick={() => add(p)} className="mt-2 w-full bg-brand-600 hover:bg-brand-700 text-white rounded-xl py-2 text-sm font-medium flex items-center justify-center gap-1">
+                            <Plus className="h-4 w-4" /> Agregar
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </section>
             ))}
@@ -249,7 +295,7 @@ export default function TiendaPage() {
           <div className="relative ml-auto w-full max-w-md bg-white h-full flex flex-col shadow-xl">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
               <h2 className="text-lg font-bold text-slate-900">Tu pedido</h2>
-              <button onClick={() => setCartOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="h-5 w-5" /></button>
+              <button onClick={() => setCartOpen(false)} aria-label="Cerrar carrito" className="text-slate-400 hover:text-slate-600"><X className="h-5 w-5" /></button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
@@ -267,7 +313,7 @@ export default function TiendaPage() {
                     <button onClick={() => setQty(l.productId, l.quantity + 1)} disabled={l.quantity >= l.stock} className="h-7 w-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center disabled:opacity-40"><Plus className="h-3 w-3" /></button>
                   </div>
                   <p className="text-sm font-bold w-20 text-right">{formatCurrency(l.price * l.quantity)}</p>
-                  <button onClick={() => setQty(l.productId, 0)} className="text-slate-300 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+                  <button onClick={() => setQty(l.productId, 0)} aria-label={`Quitar ${l.name} del carrito`} className="text-slate-300 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
                 </div>
               ))}
             </div>
@@ -276,12 +322,14 @@ export default function TiendaPage() {
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                maxLength={255}
                 placeholder="Tu nombre *"
                 className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
               <input
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
+                maxLength={500}
                 placeholder="Nota (opcional): ej. paso a las 5pm"
                 className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />

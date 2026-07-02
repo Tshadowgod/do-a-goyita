@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { db } from "@/lib/db";
 import { orders, orderItems, products } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import { z } from "zod";
 
 const orderSchema = z.object({
@@ -24,8 +24,17 @@ export async function POST(req: NextRequest) {
     const lines: { productId: number; productName: string; quantity: number; unitPrice: number; subtotal: number }[] = [];
     const insufficient: string[] = [];
 
-    for (const item of data.items) {
-      const [product] = await db.select().from(products).where(eq(products.id, item.productId));
+    // Merge duplicate product lines so stock is validated against the combined quantity
+    const merged = new Map<number, number>();
+    for (const i of data.items) merged.set(i.productId, (merged.get(i.productId) ?? 0) + i.quantity);
+    const items = [...merged.entries()].map(([productId, quantity]) => ({ productId, quantity }));
+
+    const found = await db.select().from(products)
+      .where(inArray(products.id, items.map((i) => i.productId)));
+    const byId = new Map(found.map((p) => [p.id, p]));
+
+    for (const item of items) {
+      const product = byId.get(item.productId);
       if (!product || !product.active) { insufficient.push(`Producto #${item.productId} no disponible`); continue; }
       if ((product.quantity ?? 0) < item.quantity) {
         insufficient.push(`${product.name} (disponible: ${product.quantity ?? 0})`);
@@ -51,16 +60,14 @@ export async function POST(req: NextRequest) {
       notes:        data.notes?.trim() || null,
     }).returning();
 
-    for (const l of lines) {
-      await db.insert(orderItems).values({
-        orderId:     order.id,
-        productId:   l.productId,
-        productName: l.productName,
-        quantity:    l.quantity,
-        unitPrice:   String(l.unitPrice),
-        subtotal:    String(l.subtotal),
-      });
-    }
+    await db.insert(orderItems).values(lines.map((l) => ({
+      orderId:     order.id,
+      productId:   l.productId,
+      productName: l.productName,
+      quantity:    l.quantity,
+      unitPrice:   String(l.unitPrice),
+      subtotal:    String(l.subtotal),
+    })));
 
     return NextResponse.json({ ok: true, orderId: order.id, total }, { status: 201 });
   } catch (err) {
