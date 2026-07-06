@@ -5,12 +5,22 @@ export async function POST(req: NextRequest) {
   try {
     const { username, password } = await req.json();
 
+    const envUser  = process.env.ADMIN_USERNAME;
+    const envPass  = process.env.ADMIN_PASSWORD;
+    const envToken = process.env.AUTH_TOKEN;
+    if (!envUser || !envPass || !envToken) {
+      console.error("Faltan ADMIN_USERNAME / ADMIN_PASSWORD / AUTH_TOKEN en el entorno");
+      return NextResponse.json({ error: "Servidor mal configurado" }, { status: 500 });
+    }
+
     if (
-      username === process.env.ADMIN_USERNAME &&
-      password === process.env.ADMIN_PASSWORD
+      typeof username === "string" &&
+      typeof password === "string" &&
+      username === envUser &&
+      password === envPass
     ) {
       const res = NextResponse.json({ ok: true });
-      res.cookies.set("dg_auth", process.env.AUTH_TOKEN ?? "", {
+      res.cookies.set("dg_auth", envToken, {
         httpOnly: true,
         secure:   process.env.NODE_ENV === "production",
         sameSite: "lax",

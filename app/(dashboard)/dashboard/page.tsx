@@ -22,18 +22,37 @@ interface DashboardData {
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
+  function load() {
+    setLoading(true);
+    setError(false);
     fetch("/api/dashboard")
-      .then((r) => r.json())
-      .then(setData)
+      .then(async (r) => {
+        const d = await r.json();
+        if (!r.ok || !d?.stats) throw new Error();
+        setData(d);
+      })
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, []);
+  }
+  useEffect(() => { load(); }, []);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin h-8 w-8 border-4 border-brand-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+        <p className="text-sm">No se pudo cargar el resumen</p>
+        <button onClick={load} className="mt-4 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-medium">
+          Reintentar
+        </button>
       </div>
     );
   }

@@ -37,8 +37,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const data = updateSchema.parse(body);
 
     const updateData: Record<string, unknown> = { ...data, updatedAt: new Date() };
-    // Stock is managed through lots (FIFO), never set directly on edit
-    delete updateData.quantity;
     if (data.price != null) updateData.price    = String(data.price);
     if (data.cost  != null) updateData.cost     = data.cost !== 0 ? String(data.cost) : null;
     if (data.barcode  !== undefined) updateData.barcode  = data.barcode  || null;

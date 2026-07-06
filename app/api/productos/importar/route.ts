@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { products } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { addLot } from "@/lib/inventory";
+import { addStock } from "@/lib/inventory";
 
 const itemSchema = z.object({
   name:     z.string().min(1),
@@ -35,28 +35,27 @@ export async function POST(req: NextRequest) {
       const match = byName.get(key);
 
       if (match) {
-        // Existing product → optionally refresh sale price, then add a purchase lot
-        if (item.price != null) {
-          await db.update(products)
-            .set({ price: String(item.price), updatedAt: new Date() })
-            .where(eq(products.id, match.id));
-        }
-        await addLot(match.id, item.quantity, item.cost);
+        // Existing product → refresh cost (and optionally price), then add the purchased stock
+        await db.update(products)
+          .set({
+            cost:      String(item.cost),
+            ...(item.price != null ? { price: String(item.price) } : {}),
+            updatedAt: new Date(),
+          })
+          .where(eq(products.id, match.id));
+        await addStock(match.id, item.quantity);
         updated++;
         details.push({ name: match.name, action: "actualizado", quantity: item.quantity });
       } else {
-        // New product → create with 0 stock, then add the purchase lot
+        // New product → create with the purchased stock
         const [inserted] = await db.insert(products).values({
           name:     item.name.trim(),
-          quantity: 0,
+          quantity: item.quantity,
           cost:     String(item.cost),
           price:    String(item.price ?? item.cost),
           unit:     "unidad",
         }).returning();
-        if (inserted) {
-          byName.set(key, inserted);
-          await addLot(inserted.id, item.quantity, item.cost);
-        }
+        if (inserted) byName.set(key, inserted);
         created++;
         details.push({ name: item.name.trim(), action: "creado", quantity: item.quantity });
       }

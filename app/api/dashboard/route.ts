@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { db } from "@/lib/db";
 import { sales, saleItems, expenses, products } from "@/lib/db/schema";
-import { gte, and, eq, lt, count, inArray } from "drizzle-orm";
+import { gte, and, eq, count, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { FIXED_EXPENSE_CATEGORIES, boliviaDayStart, boliviaToday } from "@/lib/utils";
 import type { DashboardStats, SalesChartPoint } from "@/types";
@@ -14,49 +14,84 @@ export async function GET() {
     const firstOfMonthStr = todayStr.slice(0, 8) + "01";
     const firstOfMonth    = boliviaDayStart(firstOfMonthStr);
 
-    // Sales today
-    const todaySalesRows = await db.select({
-      total: sql<string>`COALESCE(SUM(${sales.total}), 0)`,
-    }).from(sales).where(gte(sales.createdAt, today));
+    // Chart window – last 30 Bolivia calendar days
+    const DAY = 86400000;
+    const labelBase  = new Date(`${todayStr}T00:00:00Z`); // label anchor (UTC, no DST)
+    const chartFromStr = new Date(labelBase.getTime() - 29 * DAY).toISOString().split("T")[0];
+    const chartFrom    = boliviaDayStart(chartFromStr);
 
-    // Sales this month
-    const monthSalesRows = await db.select({
-      total: sql<string>`COALESCE(SUM(${sales.total}), 0)`,
-    }).from(sales).where(gte(sales.createdAt, firstOfMonth));
+    const [
+      todaySalesRows,
+      monthSalesRows,
+      [todayCogsRow],
+      [monthCogsRow],
+      monthExpensesRows,
+      fixedExpensesRows,
+      totalProductsRows,
+      lowStockRows,
+      salesByDay,
+      expensesByDay,
+    ] = await Promise.all([
+      // Sales today
+      db.select({
+        total: sql<string>`COALESCE(SUM(${sales.total}), 0)`,
+      }).from(sales).where(gte(sales.createdAt, today)),
 
-    // Cost of goods sold (FIFO cost recorded on each sale line)
-    const [todayCogsRow] = await db.select({
-      total: sql<string>`COALESCE(SUM(${saleItems.cost}), 0)`,
-    }).from(saleItems)
-      .innerJoin(sales, eq(saleItems.saleId, sales.id))
-      .where(gte(sales.createdAt, today));
+      // Sales this month
+      db.select({
+        total: sql<string>`COALESCE(SUM(${sales.total}), 0)`,
+      }).from(sales).where(gte(sales.createdAt, firstOfMonth)),
 
-    const [monthCogsRow] = await db.select({
-      total: sql<string>`COALESCE(SUM(${saleItems.cost}), 0)`,
-    }).from(saleItems)
-      .innerJoin(sales, eq(saleItems.saleId, sales.id))
-      .where(gte(sales.createdAt, firstOfMonth));
+      // Cost of goods sold (FIFO cost recorded on each sale line)
+      db.select({
+        total: sql<string>`COALESCE(SUM(${saleItems.cost}), 0)`,
+      }).from(saleItems)
+        .innerJoin(sales, eq(saleItems.saleId, sales.id))
+        .where(gte(sales.createdAt, today)),
 
-    // Expenses this month
-    const monthExpensesRows = await db.select({
-      total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)`,
-    }).from(expenses).where(gte(expenses.date, firstOfMonthStr));
+      db.select({
+        total: sql<string>`COALESCE(SUM(${saleItems.cost}), 0)`,
+      }).from(saleItems)
+        .innerJoin(sales, eq(saleItems.saleId, sales.id))
+        .where(gte(sales.createdAt, firstOfMonth)),
 
-    // Fixed expenses this month
-    const fixedExpensesRows = await db.select({
-      total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)`,
-    }).from(expenses).where(
-      and(
-        gte(expenses.date, firstOfMonthStr),
-        inArray(expenses.category, FIXED_EXPENSE_CATEGORIES),
-      )
-    );
+      // Expenses this month
+      db.select({
+        total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)`,
+      }).from(expenses).where(gte(expenses.date, firstOfMonthStr)),
 
-    // Total & low-stock products
-    const totalProductsRows = await db.select({ count: count() }).from(products).where(eq(products.active, true));
-    const lowStockRows = await db.select({ count: count() }).from(products).where(
-      and(eq(products.active, true), sql`${products.quantity} <= ${products.minStock}`)
-    );
+      // Fixed expenses this month
+      db.select({
+        total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)`,
+      }).from(expenses).where(
+        and(
+          gte(expenses.date, firstOfMonthStr),
+          inArray(expenses.category, FIXED_EXPENSE_CATEGORIES),
+        )
+      ),
+
+      // Total & low-stock products
+      db.select({ count: count() }).from(products).where(eq(products.active, true)),
+      db.select({ count: count() }).from(products).where(
+        and(eq(products.active, true), sql`${products.quantity} <= ${products.minStock}`)
+      ),
+
+      // Sales grouped by Bolivia calendar day (timestamps are UTC; Bolivia = UTC-4)
+      db.select({
+        day:   sql<string>`to_char(${sales.createdAt} - interval '4 hours', 'YYYY-MM-DD')`,
+        total: sql<string>`SUM(${sales.total})`,
+      }).from(sales)
+        .where(gte(sales.createdAt, chartFrom))
+        .groupBy(sql`1`),
+
+      // Expenses grouped by their date column
+      db.select({
+        day:   expenses.date,
+        total: sql<string>`SUM(${expenses.amount})`,
+      }).from(expenses)
+        .where(gte(expenses.date, chartFromStr))
+        .groupBy(expenses.date),
+    ]);
 
     const salesThisMonth    = parseFloat(monthSalesRows[0]?.total ?? "0");
     const expensesThisMonth = parseFloat(monthExpensesRows[0]?.total ?? "0");
@@ -74,28 +109,16 @@ export async function GET() {
       ? ((salesThisMonth - breakEvenRevenue) / salesThisMonth) * 100
       : 0;
 
-    // Chart data – last 30 days (Bolivia calendar days)
+    // Chart data – last 30 days (Bolivia calendar days), filled from the grouped queries
+    const salesMap    = new Map(salesByDay.map((r) => [r.day, parseFloat(r.total)]));
+    const expensesMap = new Map(expensesByDay.map((r) => [r.day, parseFloat(r.total)]));
     const chart: SalesChartPoint[] = [];
-    const labelBase = new Date(`${todayStr}T00:00:00Z`); // label anchor (UTC, no DST)
-    const DAY = 86400000;
     for (let i = 29; i >= 0; i--) {
-      const dayStr     = new Date(labelBase.getTime() - i * DAY).toISOString().split("T")[0];
-      const nextDayStr = new Date(labelBase.getTime() - (i - 1) * DAY).toISOString().split("T")[0];
-      const dayStart   = boliviaDayStart(dayStr);
-      const dayEnd     = boliviaDayStart(nextDayStr);
-
-      const [dayS] = await db.select({
-        total: sql<string>`COALESCE(SUM(${sales.total}), 0)`,
-      }).from(sales).where(and(gte(sales.createdAt, dayStart), lt(sales.createdAt, dayEnd)));
-
-      const [dayE] = await db.select({
-        total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)`,
-      }).from(expenses).where(eq(expenses.date, dayStr));
-
+      const dayStr = new Date(labelBase.getTime() - i * DAY).toISOString().split("T")[0];
       chart.push({
         date:     dayStr,
-        ingresos: parseFloat(dayS?.total ?? "0"),
-        egresos:  parseFloat(dayE?.total ?? "0"),
+        ingresos: salesMap.get(dayStr) ?? 0,
+        egresos:  expensesMap.get(dayStr) ?? 0,
       });
     }
 

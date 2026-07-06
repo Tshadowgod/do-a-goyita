@@ -132,7 +132,10 @@ export default function TiendaPage() {
       setCart([]);
       setCartOpen(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al enviar el pedido");
+      const msg = e instanceof Error && e.message ? e.message : "Error al enviar el pedido";
+      toast.error(msg);
+      // Si el stock cambió mientras armaba el pedido, refresca el catálogo
+      if (msg.toLowerCase().includes("stock")) load();
     } finally {
       setSending(false);
     }

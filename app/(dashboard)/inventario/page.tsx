@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Upload, Search, Edit2, Trash2, AlertTriangle, Package, Layers } from "lucide-react";
+import { Plus, Upload, Edit2, Trash2, AlertTriangle, Package } from "lucide-react";
 import toast from "react-hot-toast";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/Button";
@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { ProductModal } from "@/components/inventario/ProductModal";
 import { ImportModal } from "@/components/inventario/ImportModal";
-import { LotsModal } from "@/components/inventario/LotsModal";
 import { formatCurrency } from "@/lib/utils";
 import type { Product } from "@/lib/db/schema";
 
@@ -19,7 +18,6 @@ export default function InventarioPage() {
   const [query,    setQuery]    = useState("");
   const [modal,    setModal]    = useState(false);
   const [importing, setImporting] = useState(false);
-  const [lotsFor,  setLotsFor]  = useState<Product | null>(null);
   const [editing,  setEditing]  = useState<Product | null>(null);
 
   const load = useCallback(async () => {
@@ -121,9 +119,6 @@ export default function InventarioPage() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex gap-2">
-                            <button onClick={() => setLotsFor(p)} className="text-slate-400 hover:text-brand-600 transition-colors" title="Lotes / Agregar stock">
-                              <Layers className="h-4 w-4" />
-                            </button>
                             <button onClick={() => { setEditing(p); setModal(true); }} className="text-slate-400 hover:text-brand-600 transition-colors" title="Editar">
                               <Edit2 className="h-4 w-4" />
                             </button>
@@ -152,9 +147,6 @@ export default function InventarioPage() {
                       <p className="text-xs text-slate-500 mt-0.5">{p.category ?? "Sin categoría"}</p>
                     </div>
                     <div className="flex gap-3">
-                      <button onClick={() => setLotsFor(p)} className="text-slate-400 hover:text-brand-600">
-                        <Layers className="h-4 w-4" />
-                      </button>
                       <button onClick={() => { setEditing(p); setModal(true); }} className="text-slate-400 hover:text-brand-600">
                         <Edit2 className="h-4 w-4" />
                       </button>
@@ -194,13 +186,6 @@ export default function InventarioPage() {
         open={importing}
         onClose={() => setImporting(false)}
         onImported={load}
-      />
-
-      <LotsModal
-        open={lotsFor !== null}
-        onClose={() => setLotsFor(null)}
-        product={lotsFor}
-        onChanged={load}
       />
     </div>
   );

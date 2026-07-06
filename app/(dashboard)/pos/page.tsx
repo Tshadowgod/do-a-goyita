@@ -21,21 +21,35 @@ export default function POSPage() {
   const { addItem, items } = useCartStore();
 
   const searchProducts = useCallback(async (q: string) => {
-    const url = q ? `/api/productos?q=${encodeURIComponent(q)}` : "/api/productos";
-    const res  = await fetch(url);
-    const data = await res.json();
-    setProducts(data.filter((p: Product) => p.active && (p.quantity ?? 0) > 0));
+    try {
+      const url = q ? `/api/productos?q=${encodeURIComponent(q)}` : "/api/productos";
+      const res  = await fetch(url);
+      const data = await res.json();
+      if (!res.ok || !Array.isArray(data)) throw new Error();
+      setProducts(data.filter((p: Product) => p.active && (p.quantity ?? 0) > 0));
+    } catch {
+      toast.error("No se pudieron cargar los productos");
+    }
   }, []);
 
+  // Debounce: espera a que se deje de escribir antes de consultar
   useEffect(() => {
-    searchProducts(query);
+    const t = setTimeout(() => searchProducts(query), query ? 300 : 0);
+    return () => clearTimeout(t);
   }, [query, searchProducts]);
 
   async function handleBarcode(barcode: string) {
     setScanning(false);
-    const res  = await fetch(`/api/productos?barcode=${encodeURIComponent(barcode)}`);
-    const data = await res.json();
-    const product: Product = data[0];
+    let product: Product | undefined;
+    try {
+      const res  = await fetch(`/api/productos?barcode=${encodeURIComponent(barcode)}`);
+      const data = await res.json();
+      if (!res.ok || !Array.isArray(data)) throw new Error();
+      product = data[0];
+    } catch {
+      toast.error("Error al buscar el código de barras");
+      return;
+    }
 
     if (!product) {
       toast.error(`Producto no encontrado: ${barcode}`);

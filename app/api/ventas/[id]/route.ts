@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { db } from "@/lib/db";
-import { sales, saleItems, products, lotConsumptions } from "@/lib/db/schema";
+import { sales, saleItems, products } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { consumeFifo, restoreSaleConsumptions } from "@/lib/inventory";
+import { consumeStock, restoreSaleStock } from "@/lib/inventory";
 
 const itemSchema = z.object({
   productId:   z.number().int().positive().nullable().optional(),
@@ -45,12 +45,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (data.paymentMethod !== undefined) updateData.paymentMethod = data.paymentMethod;
     if (data.notes         !== undefined) updateData.notes         = data.notes || null;
 
-    // If items were provided, reconcile stock (FIFO) and replace line items
+    // If items were provided, reconcile stock and replace line items
     if (data.items) {
       // Validate stock: available = current stock + what THIS sale already consumed
-      const oldCons = await db.select().from(lotConsumptions).where(eq(lotConsumptions.saleId, saleId));
+      const oldItems = await db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
       const consumedByProduct = new Map<number, number>();
-      for (const c of oldCons) {
+      for (const c of oldItems) {
         if (c.productId != null) consumedByProduct.set(c.productId, (consumedByProduct.get(c.productId) ?? 0) + c.quantity);
       }
       const insufficient: string[] = [];
@@ -70,20 +70,20 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         );
       }
 
-      // 1. Return the lots consumed by the original sale
-      await restoreSaleConsumptions(saleId);
+      // 1. Return the stock consumed by the original sale
+      await restoreSaleStock(saleId);
 
       // 2. Remove old line items
       await db.delete(saleItems).where(eq(saleItems.saleId, saleId));
 
-      // 3. Insert new line items, consuming stock again via FIFO
+      // 3. Insert new line items, discounting stock again
       let total = 0;
       for (const item of data.items) {
         const subtotal = item.unitPrice * item.quantity;
         total += subtotal;
 
         const cogs = item.productId != null
-          ? await consumeFifo(saleId, item.productId, item.quantity)
+          ? await consumeStock(item.productId, item.quantity)
           : 0;
 
         await db.insert(saleItems).values({
@@ -121,8 +121,8 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params;
     const saleId = parseInt(id);
 
-    // Return the consumed lots to stock, then delete (saleItems cascade)
-    await restoreSaleConsumptions(saleId);
+    // Return the consumed stock, then delete (saleItems cascade)
+    await restoreSaleStock(saleId);
     await db.delete(sales).where(eq(sales.id, saleId));
     return NextResponse.json({ ok: true });
   } catch (err) {

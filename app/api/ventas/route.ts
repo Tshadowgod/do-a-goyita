@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { db } from "@/lib/db";
 import { sales, saleItems, products } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { desc, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { consumeFifo } from "@/lib/inventory";
+import { consumeStock } from "@/lib/inventory";
 
 const saleItemSchema = z.object({
   productId: z.number().int().positive(),
@@ -37,13 +37,20 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const data = saleSchema.parse(body);
 
-    // Validate stock — never sell more than the available inventory
+    // Fetch every product once; validate stock against the combined quantity per product
+    const found = await db.select().from(products)
+      .where(inArray(products.id, [...new Set(data.items.map((i) => i.productId))]));
+    const byId = new Map(found.map((p) => [p.id, p]));
+
+    const requested = new Map<number, number>();
+    for (const i of data.items) requested.set(i.productId, (requested.get(i.productId) ?? 0) + i.quantity);
+
     const insufficient: string[] = [];
-    for (const item of data.items) {
-      const [product] = await db.select().from(products).where(eq(products.id, item.productId));
-      if (!product) { insufficient.push(`Producto #${item.productId} no existe`); continue; }
-      if ((product.quantity ?? 0) < item.quantity) {
-        insufficient.push(`${product.name} (disponible: ${product.quantity ?? 0}, pediste: ${item.quantity})`);
+    for (const [productId, quantity] of requested) {
+      const product = byId.get(productId);
+      if (!product) { insufficient.push(`Producto #${productId} no existe`); continue; }
+      if ((product.quantity ?? 0) < quantity) {
+        insufficient.push(`${product.name} (disponible: ${product.quantity ?? 0}, pediste: ${quantity})`);
       }
     }
     if (insufficient.length) {
@@ -61,12 +68,12 @@ export async function POST(req: NextRequest) {
       notes: data.notes ?? null,
     }).returning();
 
-    // get product names, consume stock via FIFO and record COGS
+    // get product names, discount stock and record COGS at the product's reference cost
     for (const item of data.items) {
-      const [product] = await db.select().from(products).where(eq(products.id, item.productId));
+      const product = byId.get(item.productId);
       if (!product) continue;
 
-      const cogs = await consumeFifo(sale.id, item.productId, item.quantity);
+      const cogs = await consumeStock(item.productId, item.quantity);
 
       await db.insert(saleItems).values({
         saleId:      sale.id,

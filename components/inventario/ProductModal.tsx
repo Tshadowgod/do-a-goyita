@@ -99,12 +99,9 @@ export function ProductModal({ open, onClose, product, onSaved }: Props) {
             <Input label="Nombre del producto *" {...register("name")} error={errors.name?.message} />
           </div>
           <Input label="Precio de venta *" type="number" step="0.01" {...register("price")} error={errors.price?.message} />
-          <Input label={product ? "Costo de referencia" : "Costo inicial"} type="number" step="0.01" {...register("cost")}  error={errors.cost?.message} />
-          {product ? (
-            <Input label="Stock actual" type="number" value={product.quantity ?? 0} disabled hint="Se gestiona por lotes (botón Lotes)" />
-          ) : (
-            <Input label="Cantidad inicial" type="number" {...register("quantity")} error={errors.quantity?.message} hint="Crea el primer lote con el costo inicial" />
-          )}
+          <Input label="Costo (referencia)" type="number" step="0.01" {...register("cost")}  error={errors.cost?.message} />
+          <Input label={product ? "Stock actual" : "Cantidad inicial"} type="number" {...register("quantity")} error={errors.quantity?.message} />
+
           <Input label="Stock mínimo"       type="number" {...register("minStock")}  error={errors.minStock?.message} />
           <Input label="Categoría"          {...register("category")} placeholder="Bebidas, Snacks..." />
           <Select label="Unidad" options={UNITS} {...register("unit")} />

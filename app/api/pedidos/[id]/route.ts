@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { orders, orderItems, sales, saleItems, products, debtors, fios } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { consumeFifo } from "@/lib/inventory";
+import { consumeStock } from "@/lib/inventory";
 
 const actionSchema = z.object({
   action:      z.enum(["confirmar", "rechazar", "fiar"]),
@@ -36,7 +36,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json(updated);
     }
 
-    // action === "confirmar" → validate stock, then create the sale (FIFO)
+    // action === "confirmar" → validate stock, then create the sale
     const insufficient: string[] = [];
     for (const item of order.items) {
       if (item.productId == null) { insufficient.push(`${item.productName} (ya no existe)`); continue; }
@@ -67,7 +67,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     for (const item of order.items) {
       if (item.productId == null) continue;
-      const cogs = await consumeFifo(sale.id, item.productId, item.quantity);
+      const cogs = await consumeStock(item.productId, item.quantity);
       await db.insert(saleItems).values({
         saleId:      sale.id,
         productId:   item.productId,
