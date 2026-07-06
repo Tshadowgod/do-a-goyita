@@ -45,11 +45,31 @@ interface Props {
 }
 
 export function ProductModal({ open, onClose, product, onSaved }: Props) {
-  const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
 
+  const [categories, setCategories] = useState<string[]>([]);
+  const [addingCategory, setAddingCategory] = useState(false);
+  const categoryValue = watch("category") ?? "";
+
+  // Carga las categorías ya usadas en otros productos (para el desplegable)
   useEffect(() => {
+    if (!open) return;
+    fetch("/api/productos")
+      .then((r) => r.json())
+      .then((data: Product[]) => {
+        if (!Array.isArray(data)) return;
+        const cats = [...new Set(
+          data.map((p) => p.category?.trim()).filter((c): c is string => !!c),
+        )].sort((a, b) => a.localeCompare(b));
+        setCategories(cats);
+      })
+      .catch(() => {});
+  }, [open]);
+
+  useEffect(() => {
+    setAddingCategory(false);
     if (product) {
       reset({
         name:        product.name,
@@ -64,9 +84,18 @@ export function ProductModal({ open, onClose, product, onSaved }: Props) {
         minStock:    product.minStock ?? 5,
       });
     } else {
-      reset({ unit: "unidad", quantity: 0, minStock: 5 });
+      reset({ unit: "unidad", quantity: 0, minStock: 5, category: "" });
     }
   }, [product, reset, open]);
+
+  // Incluye la categoría actual del producto aunque aún no esté en la lista cargada
+  const categoryOptions = [
+    { value: "", label: "Sin categoría" },
+    ...[...new Set([...categories, ...(categoryValue ? [categoryValue] : [])])]
+      .sort((a, b) => a.localeCompare(b))
+      .map((c) => ({ value: c, label: c })),
+    { value: "__new__", label: "➕ Nueva categoría…" },
+  ];
 
   async function onSubmit(data: FormData) {
     const url    = product ? `/api/productos/${product.id}` : "/api/productos";
@@ -103,7 +132,34 @@ export function ProductModal({ open, onClose, product, onSaved }: Props) {
           <Input label={product ? "Stock actual" : "Cantidad inicial"} type="number" {...register("quantity")} error={errors.quantity?.message} />
 
           <Input label="Stock mínimo"       type="number" {...register("minStock")}  error={errors.minStock?.message} />
-          <Input label="Categoría"          {...register("category")} placeholder="Bebidas, Snacks..." />
+          {addingCategory ? (
+            <div className="flex flex-col gap-1">
+              <Input
+                label="Categoría (nueva)"
+                autoFocus
+                value={categoryValue}
+                onChange={(e) => setValue("category", e.target.value)}
+                placeholder="Escribe la nueva categoría"
+              />
+              <button
+                type="button"
+                onClick={() => { setAddingCategory(false); setValue("category", ""); }}
+                className="text-xs text-brand-600 self-start hover:underline"
+              >
+                ← Elegir de la lista
+              </button>
+            </div>
+          ) : (
+            <Select
+              label="Categoría"
+              options={categoryOptions}
+              value={categoryValue}
+              onChange={(e) => {
+                if (e.target.value === "__new__") { setAddingCategory(true); setValue("category", ""); }
+                else setValue("category", e.target.value);
+              }}
+            />
+          )}
           <Select label="Unidad" options={UNITS} {...register("unit")} />
           <div className="col-span-2">
             <Input label="Código de barras" {...register("barcode")} placeholder="Déjalo vacío para escanear después" />
